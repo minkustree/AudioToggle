@@ -172,6 +172,7 @@
   </ItemGroup>
   <ItemGroup>
     <Image Include="AudioToggle.ico" />
+    <Image Include="icon1.ico" />
     <Image Include="small.ico" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

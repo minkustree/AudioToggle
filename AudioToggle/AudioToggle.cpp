@@ -10,12 +10,12 @@
 HINSTANCE hInst;                                // current instance
 WCHAR szTitle[MAX_LOADSTRING];                  // The title bar text
 WCHAR szWindowClass[MAX_LOADSTRING];            // the main window class name
-//HWND hWnd;									// handle of the main window
 // change this GUID if the app location changes
 // {BA802CE8-2788-4798-9C42-83E9A78AD87C}
 static const GUID nicon_guid =
 { 0xba802ce8, 0x2788, 0x4798,{ 0x9c, 0x42, 0x83, 0xe9, 0xa7, 0x8a, 0xd8, 0x7c } };
-//NOTIFYICONDATA nid;								// keeps track of the tray icon
+
+UINT const WMAPP_NOTIFY_EVENT = WM_APP + 1; // called when something happens in the tray icon
 
 // Forward declarations of functions included in this code module:
 ATOM                MyRegisterClass(HINSTANCE hInstance);
@@ -69,11 +69,12 @@ HRESULT ShowNotificationIcon(HWND hWnd)
 	NOTIFYICONDATA nid = { sizeof(nid) };
 		
 	nid.hWnd = hWnd;
-	nid.uFlags = NIF_ICON | NIF_TIP | NIF_SHOWTIP | NIF_GUID;
+	nid.uFlags = NIF_ICON | NIF_TIP | NIF_SHOWTIP | NIF_GUID | NIF_MESSAGE;
 	//nid.uID = 3004;
 	nid.guidItem = nicon_guid;
 	StringCchCopy(nid.szTip, ARRAYSIZE(nid.szTip), TEXT("Andy's Tooltip"));
 	LoadIconMetric(hInst, MAKEINTRESOURCE(IDI_SMALL), LIM_SMALL, &nid.hIcon);
+	nid.uCallbackMessage = WMAPP_NOTIFY_EVENT;
 	Shell_NotifyIcon(NIM_ADD, &nid);
 
 	nid.uVersion = NOTIFYICON_VERSION_4;
@@ -86,6 +87,15 @@ HRESULT RemoveNotificationIcon()
 	nid.uFlags = NIF_GUID;
 	nid.guidItem = nicon_guid;
 	return Shell_NotifyIcon(NIM_DELETE, &nid);
+}
+
+HRESULT ModifyNotificationText()
+{
+	NOTIFYICONDATA nid = { sizeof(nid) };
+	nid.uFlags = NIF_GUID | NIF_TIP | NIF_SHOWTIP;
+	nid.guidItem = nicon_guid;
+	StringCchCopy(nid.szTip, ARRAYSIZE(nid.szTip), TEXT("Hello World!"));
+	return Shell_NotifyIcon(NIM_MODIFY, &nid);
 }
 
 //
@@ -188,9 +198,23 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         }
         break;
     case WM_DESTROY:
-		RemoveNotificationIcon();
-        PostQuitMessage(0);
-        break;
+		{
+			RemoveNotificationIcon();
+			PostQuitMessage(0);
+		
+		}
+		break;
+	case WMAPP_NOTIFY_EVENT:
+		{
+		switch (LOWORD(lParam)) {
+		case NIN_SELECT:
+			{
+				ModifyNotificationText();
+				break;
+			}
+		}
+		break;
+	}
     default:
         return DefWindowProc(hWnd, message, wParam, lParam);
     }
