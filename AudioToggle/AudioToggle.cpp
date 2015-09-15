@@ -14,6 +14,7 @@ WCHAR szWindowClass[MAX_LOADSTRING];            // the main window class name
 // {BA802CE8-2788-4798-9C42-83E9A78AD87C}
 static const GUID nicon_guid =
 { 0xba802ce8, 0x2788, 0x4798,{ 0x9c, 0x42, 0x83, 0xe9, 0xa7, 0x8a, 0xd8, 0x7c } };
+static const UINT NOTIFY_ICON_ID = 1;			// identifies a specific notification icon
 HICON speakerIcon;
 HICON headphoneIcon;
 BOOL isAltIcon;
@@ -26,7 +27,7 @@ BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 HRESULT				ShowNotificationIcon(HWND hWnd);
-HRESULT				RemoveNotificationIcon();
+HRESULT				RemoveNotificationIcon(HWND hWnd);
 void				LoadIcons(HINSTANCE hInstance);
 void				FreeIcons();
 
@@ -78,9 +79,9 @@ HRESULT ShowNotificationIcon(HWND hWnd)
 	NOTIFYICONDATA nid = { sizeof(nid) };
 		
 	nid.hWnd = hWnd;
-	nid.uFlags = NIF_ICON | NIF_TIP | NIF_SHOWTIP | NIF_GUID | NIF_MESSAGE;
-	//nid.uID = 3004;
-	nid.guidItem = nicon_guid;
+	nid.uFlags = NIF_ICON | NIF_TIP | NIF_SHOWTIP |  NIF_MESSAGE;
+	nid.uID = NOTIFY_ICON_ID;
+	
 	StringCchCopy(nid.szTip, ARRAYSIZE(nid.szTip), TEXT("Andy's Tooltip"));
 	//LoadIconMetric(hInst, MAKEINTRESOURCE(IDI_SMALL), LIM_SMALL, &nid.hIcon);
 	nid.hIcon = speakerIcon;
@@ -91,19 +92,20 @@ HRESULT ShowNotificationIcon(HWND hWnd)
 	return Shell_NotifyIcon(NIM_SETVERSION, &nid);
 }
 
-HRESULT RemoveNotificationIcon()
+HRESULT RemoveNotificationIcon(HWND hWnd)
 {
 	NOTIFYICONDATA nid = { sizeof(nid) };
-	nid.uFlags = NIF_GUID;
-	nid.guidItem = nicon_guid;
+	nid.hWnd = hWnd;
+	nid.uID = NOTIFY_ICON_ID;
 	return Shell_NotifyIcon(NIM_DELETE, &nid);
 }
 
-HRESULT ModifyNotificationText()
+HRESULT ModifyNotificationText(HWND hWnd)
 {
 	NOTIFYICONDATA nid = { sizeof(nid) };
-	nid.uFlags = NIF_GUID | NIF_TIP | NIF_SHOWTIP | NIF_ICON;
-	nid.guidItem = nicon_guid;
+	nid.uFlags = NIF_TIP | NIF_SHOWTIP | NIF_ICON;
+	nid.hWnd = hWnd;
+	nid.uID = NOTIFY_ICON_ID;
 	
 	if (isAltIcon)
 	{
@@ -220,7 +222,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         break;
     case WM_DESTROY:
 		{
-			RemoveNotificationIcon();
+			RemoveNotificationIcon(hWnd);
 			FreeIcons();
 			PostQuitMessage(0);
 		
@@ -231,7 +233,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		switch (LOWORD(lParam)) {
 		case NIN_SELECT:
 			{
-				ModifyNotificationText();
+				ModifyNotificationText(hWnd);
 				break;
 			}
 		}
@@ -266,10 +268,10 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 void LoadIcons(HINSTANCE hInstance)
 {
 	HMODULE mmres = LoadLibrary(TEXT("mmres"));
-	speakerIcon = (HICON)LoadImage(mmres, MAKEINTRESOURCE(3004), IMAGE_ICON, GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), LR_SHARED);
-	headphoneIcon = (HICON)LoadImage(mmres, MAKEINTRESOURCE(3015), IMAGE_ICON, GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), LR_SHARED);
-	//speakerIcon = ExtractIcon(hInstance, TEXT("C:\\Windows\\System32\\mmres.dll"), -3004);
-	//headphoneIcon = ExtractIcon(hInstance, TEXT("C:\\Windows\\System32\\mmres.dll"), -3015);
+	speakerIcon = static_cast<HICON>(LoadImage(mmres, MAKEINTRESOURCE(3004), IMAGE_ICON, GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), LR_SHARED));
+	headphoneIcon = static_cast<HICON>(LoadImage(mmres, MAKEINTRESOURCE(3015), IMAGE_ICON, GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), LR_SHARED));
+	// not sure if I have to free this libary here or not, or whether it renders the icons invalid?
+	FreeLibrary(mmres);
 }
 
 void FreeIcons() 
