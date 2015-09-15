@@ -14,6 +14,9 @@ WCHAR szWindowClass[MAX_LOADSTRING];            // the main window class name
 // {BA802CE8-2788-4798-9C42-83E9A78AD87C}
 static const GUID nicon_guid =
 { 0xba802ce8, 0x2788, 0x4798,{ 0x9c, 0x42, 0x83, 0xe9, 0xa7, 0x8a, 0xd8, 0x7c } };
+HICON speakerIcon;
+HICON headphoneIcon;
+BOOL isAltIcon;
 
 UINT const WMAPP_NOTIFY_EVENT = WM_APP + 1; // called when something happens in the tray icon
 
@@ -24,6 +27,8 @@ LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 HRESULT				ShowNotificationIcon(HWND hWnd);
 HRESULT				RemoveNotificationIcon();
+void				LoadIcons(HINSTANCE hInstance);
+void				FreeIcons();
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
@@ -39,6 +44,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
     LoadStringW(hInstance, IDC_AUDIOTOGGLE, szWindowClass, MAX_LOADSTRING);
     MyRegisterClass(hInstance);
+
+	// Pre-load icons
+	LoadIcons(hInstance);
+	isAltIcon = FALSE;
 
     // Perform application initialization:
     if (!InitInstance (hInstance, nCmdShow))
@@ -73,7 +82,8 @@ HRESULT ShowNotificationIcon(HWND hWnd)
 	//nid.uID = 3004;
 	nid.guidItem = nicon_guid;
 	StringCchCopy(nid.szTip, ARRAYSIZE(nid.szTip), TEXT("Andy's Tooltip"));
-	LoadIconMetric(hInst, MAKEINTRESOURCE(IDI_SMALL), LIM_SMALL, &nid.hIcon);
+	//LoadIconMetric(hInst, MAKEINTRESOURCE(IDI_SMALL), LIM_SMALL, &nid.hIcon);
+	nid.hIcon = speakerIcon;
 	nid.uCallbackMessage = WMAPP_NOTIFY_EVENT;
 	Shell_NotifyIcon(NIM_ADD, &nid);
 
@@ -92,9 +102,20 @@ HRESULT RemoveNotificationIcon()
 HRESULT ModifyNotificationText()
 {
 	NOTIFYICONDATA nid = { sizeof(nid) };
-	nid.uFlags = NIF_GUID | NIF_TIP | NIF_SHOWTIP;
+	nid.uFlags = NIF_GUID | NIF_TIP | NIF_SHOWTIP | NIF_ICON;
 	nid.guidItem = nicon_guid;
-	StringCchCopy(nid.szTip, ARRAYSIZE(nid.szTip), TEXT("Hello World!"));
+	
+	if (isAltIcon)
+	{
+		StringCchCopy(nid.szTip, ARRAYSIZE(nid.szTip), TEXT("Speakers"));
+		nid.hIcon = speakerIcon;
+	}
+	else
+	{
+		StringCchCopy(nid.szTip, ARRAYSIZE(nid.szTip), TEXT("Headphones"));
+		nid.hIcon = headphoneIcon;
+	}
+	isAltIcon = !isAltIcon;
 	return Shell_NotifyIcon(NIM_MODIFY, &nid);
 }
 
@@ -200,6 +221,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     case WM_DESTROY:
 		{
 			RemoveNotificationIcon();
+			FreeIcons();
 			PostQuitMessage(0);
 		
 		}
@@ -239,4 +261,19 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
         break;
     }
     return (INT_PTR)FALSE;
+}
+
+void LoadIcons(HINSTANCE hInstance)
+{
+	HMODULE mmres = LoadLibrary(TEXT("mmres"));
+	speakerIcon = (HICON)LoadImage(mmres, MAKEINTRESOURCE(3004), IMAGE_ICON, GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), LR_SHARED);
+	headphoneIcon = (HICON)LoadImage(mmres, MAKEINTRESOURCE(3015), IMAGE_ICON, GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), LR_SHARED);
+	//speakerIcon = ExtractIcon(hInstance, TEXT("C:\\Windows\\System32\\mmres.dll"), -3004);
+	//headphoneIcon = ExtractIcon(hInstance, TEXT("C:\\Windows\\System32\\mmres.dll"), -3015);
+}
+
+void FreeIcons() 
+{
+	//if (speakerIcon) DestroyIcon(speakerIcon);
+	//if (headphoneIcon) DestroyIcon(headphoneIcon);
 }
