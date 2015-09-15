@@ -268,7 +268,7 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 void LoadIcons(HINSTANCE hInstance)
 {
 	HMODULE mmres = LoadLibrary(TEXT("mmres"));
-	speakerIcon = static_cast<HICON>(LoadImage(mmres, MAKEINTRESOURCE(3004), IMAGE_ICON, GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), LR_SHARED));
+	speakerIcon = static_cast<HICON>(LoadImage(mmres, MAKEINTRESOURCE(3010), IMAGE_ICON, GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), LR_SHARED));
 	headphoneIcon = static_cast<HICON>(LoadImage(mmres, MAKEINTRESOURCE(3015), IMAGE_ICON, GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), LR_SHARED));
 	// not sure if I have to free this libary here or not, or whether it renders the icons invalid?
 	FreeLibrary(mmres);
