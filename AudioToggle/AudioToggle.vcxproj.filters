@@ -30,12 +30,21 @@
     <ClInclude Include="AudioToggle.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="IPolicyConfig.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="PlaybackDeviceToggle.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="AudioToggle.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="PlaybackDeviceToggle.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

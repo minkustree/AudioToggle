@@ -3,6 +3,7 @@
 
 #include "stdafx.h"
 #include "AudioToggle.h"
+#include "PlaybackDeviceToggle.h"
 
 #define MAX_LOADSTRING 100
 
@@ -36,6 +37,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     UNREFERENCED_PARAMETER(lpCmdLine);
 
     // TODO: Place code here.
+	InitCOM();
+	LPWSTR deviceId;
+	GetDefaultAudioPlaybackDevice(&deviceId);
+	CoTaskMemFree(deviceId);
 
     // Initialize global strings
     LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
@@ -215,6 +220,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		{
 			RemoveNotificationIcon(hWnd);
 			FreeIcons();
+			CleanupCOM();
 			PostQuitMessage(0);
 		}
 		break;

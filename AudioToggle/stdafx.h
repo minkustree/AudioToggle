@@ -13,6 +13,7 @@
 #include <shellapi.h>
 #include <commctrl.h>
 #include <strsafe.h>
+#include <objbase.h>
 
 // C RunTime Header Files
 #include <stdlib.h>
