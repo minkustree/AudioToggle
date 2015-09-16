@@ -10,16 +10,12 @@
 HINSTANCE hInst;                                // current instance
 WCHAR szTitle[MAX_LOADSTRING];                  // The title bar text
 WCHAR szWindowClass[MAX_LOADSTRING];            // the main window class name
-// change this GUID if the app location changes
-// {BA802CE8-2788-4798-9C42-83E9A78AD87C}
-static const GUID nicon_guid =
-{ 0xba802ce8, 0x2788, 0x4798,{ 0x9c, 0x42, 0x83, 0xe9, 0xa7, 0x8a, 0xd8, 0x7c } };
-static const UINT NOTIFY_ICON_ID = 1;			// identifies a specific notification icon
 HICON speakerIcon;
 HICON headphoneIcon;
 BOOL isAltIcon;
 
-UINT const WMAPP_NOTIFY_EVENT = WM_APP + 1; // called when something happens in the tray icon
+static const UINT NOTIFY_ICON_ID = 1;			// identifies a specific notification icon
+const UINT WMAPP_NOTIFY_EVENT = WM_APP + 1;		// called when something happens in the tray icon
 
 // Forward declarations of functions included in this code module:
 ATOM                MyRegisterClass(HINSTANCE hInstance);
@@ -81,11 +77,9 @@ HRESULT ShowNotificationIcon(HWND hWnd)
 	nid.hWnd = hWnd;
 	nid.uFlags = NIF_ICON | NIF_TIP | NIF_SHOWTIP |  NIF_MESSAGE;
 	nid.uID = NOTIFY_ICON_ID;
-	
-	StringCchCopy(nid.szTip, ARRAYSIZE(nid.szTip), TEXT("Andy's Tooltip"));
-	//LoadIconMetric(hInst, MAKEINTRESOURCE(IDI_SMALL), LIM_SMALL, &nid.hIcon);
 	nid.hIcon = speakerIcon;
 	nid.uCallbackMessage = WMAPP_NOTIFY_EVENT;
+	StringCchCopy(nid.szTip, ARRAYSIZE(nid.szTip), TEXT("Andy's Tooltip"));
 	Shell_NotifyIcon(NIM_ADD, &nid);
 
 	nid.uVersion = NOTIFYICON_VERSION_4;
@@ -201,9 +195,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             // Parse the menu selections:
             switch (wmId)
             {
-            case IDM_ABOUT:
-                DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
-                break;
             case IDM_EXIT:
                 DestroyWindow(hWnd);
                 break;
@@ -225,7 +216,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			RemoveNotificationIcon(hWnd);
 			FreeIcons();
 			PostQuitMessage(0);
-		
 		}
 		break;
 	case WMAPP_NOTIFY_EVENT:
@@ -243,26 +233,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         return DefWindowProc(hWnd, message, wParam, lParam);
     }
     return 0;
-}
-
-// Message handler for about box.
-INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
-{
-    UNREFERENCED_PARAMETER(lParam);
-    switch (message)
-    {
-    case WM_INITDIALOG:
-        return (INT_PTR)TRUE;
-
-    case WM_COMMAND:
-        if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL)
-        {
-            EndDialog(hDlg, LOWORD(wParam));
-            return (INT_PTR)TRUE;
-        }
-        break;
-    }
-    return (INT_PTR)FALSE;
 }
 
 void LoadIcons(HINSTANCE hInstance)
