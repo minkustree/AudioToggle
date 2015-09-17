@@ -14,6 +14,7 @@ WCHAR szWindowClass[MAX_LOADSTRING];            // the main window class name
 HICON speakerIcon;
 HICON headphoneIcon;
 BOOL isAltIcon;
+HMENU g_contextMenu;
 
 static const UINT NOTIFY_ICON_ID = 1;			// identifies a specific notification icon
 const UINT WMAPP_NOTIFY_EVENT = WM_APP + 1;		// called when something happens in the tray icon
@@ -27,6 +28,7 @@ HRESULT				ShowNotificationIcon(HWND hWnd);
 HRESULT				RemoveNotificationIcon(HWND hWnd);
 void				LoadIcons(HINSTANCE hInstance);
 void				FreeIcons();
+BOOL				ShowContextMenu(HWND hwnd, POINT pt);
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
@@ -85,9 +87,8 @@ HRESULT ShowNotificationIcon(HWND hWnd)
 	nid.hIcon = speakerIcon;
 	nid.uCallbackMessage = WMAPP_NOTIFY_EVENT;
 	StringCchCopy(nid.szTip, ARRAYSIZE(nid.szTip), TEXT("Andy's Tooltip"));
-	Shell_NotifyIcon(NIM_ADD, &nid);
-
 	nid.uVersion = NOTIFYICON_VERSION_4;
+	Shell_NotifyIcon(NIM_ADD, &nid);
 	return Shell_NotifyIcon(NIM_SETVERSION, &nid);
 }
 
@@ -168,10 +169,13 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
       return FALSE;
    }
 
-   ShowWindow(hWnd, nCmdShow);
-   UpdateWindow(hWnd);
-
    return TRUE;
+}
+
+void InitContextMenu()
+{
+	
+
 }
 
 //
@@ -189,56 +193,95 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     switch (message)
     {
 	case WM_CREATE:
-		{
-			// add the notification icon
-			ShowNotificationIcon(hWnd);
-			break;
-		}
-    case WM_COMMAND:
-        {
-            int wmId = LOWORD(wParam);
-            // Parse the menu selections:
-            switch (wmId)
-            {
-            case IDM_EXIT:
-                DestroyWindow(hWnd);
-                break;
-            default:
-                return DefWindowProc(hWnd, message, wParam, lParam);
-            }
-        }
-        break;
-    case WM_PAINT:
-        {
-            PAINTSTRUCT ps;
-            HDC hdc = BeginPaint(hWnd, &ps);
-            // TODO: Add any drawing code that uses hdc here...
-            EndPaint(hWnd, &ps);
-        }
-        break;
-    case WM_DESTROY:
-		{
-			RemoveNotificationIcon(hWnd);
-			FreeIcons();
-			CleanupCOM();
-			PostQuitMessage(0);
-		}
+		// add the notification icon
+		ShowNotificationIcon(hWnd);
 		break;
-	case WMAPP_NOTIFY_EVENT:
+    case WM_COMMAND:
 		{
-		switch (LOWORD(lParam)) {
-		case NIN_SELECT:
+			int wmId = LOWORD(wParam);
+			// Parse the menu selections:
+			switch (wmId)
 			{
-				ModifyNotificationText(hWnd);
+			case IDM_EXIT:
+			case IDM_CONTEXT_EXIT:
+				DestroyWindow(hWnd);
 				break;
+			default:
+				return DefWindowProc(hWnd, message, wParam, lParam);
 			}
 		}
+        break;
+  //  case WM_PAINT:
+		//{
+		//	PAINTSTRUCT ps;
+		//	HDC hdc = BeginPaint(hWnd, &ps);
+		//	// TODO: Add any drawing code that uses hdc here...
+		//	EndPaint(hWnd, &ps);
+		//}
+  //      break;
+    case WM_DESTROY:
+		RemoveNotificationIcon(hWnd);
+		FreeIcons();
+		DestroyMenu(g_contextMenu);
+		CleanupCOM();
+		PostQuitMessage(0);
 		break;
-	}
+	case WMAPP_NOTIFY_EVENT:
+		switch (LOWORD(lParam))
+		{
+		case NIN_SELECT:
+			ModifyNotificationText(hWnd);
+			break;
+		case WM_CONTEXTMENU:
+		{
+
+			POINT pt = { GET_X_LPARAM(wParam), GET_Y_LPARAM(wParam) };
+			ShowContextMenu(hWnd, pt);
+			break;
+		}
+		}
+		break;
     default:
         return DefWindowProc(hWnd, message, wParam, lParam);
     }
     return 0;
+}
+
+BOOL ShowContextMenu(HWND hwnd, POINT pt)
+{
+	HMENU hMenu = LoadMenu(hInst, MAKEINTRESOURCE(IDR_CONTEXTMENU));
+	if (hMenu)
+	{
+		HMENU hSubMenu = GetSubMenu(hMenu, 0);
+		if (hSubMenu)
+		{
+			// our window must be foreground before calling TrackPopupMenu or the menu will not disappear when the user clicks away
+			SetForegroundWindow(hwnd);
+
+			// respect menu drop alignment
+			UINT uFlags = TPM_RIGHTBUTTON;
+			if (GetSystemMetrics(SM_MENUDROPALIGNMENT) != 0)
+			{
+				uFlags |= TPM_RIGHTALIGN;
+			}
+			else
+			{
+				uFlags |= TPM_LEFTALIGN;
+			}
+
+			TrackPopupMenuEx(hSubMenu, uFlags, pt.x, pt.y, hwnd, NULL);
+		}
+		else
+		{
+			return FALSE;
+		}
+		DestroyMenu(hMenu);
+	}
+	else
+	{
+		return FALSE;
+	}
+	return TRUE;
 }
 
 void LoadIcons(HINSTANCE hInstance)

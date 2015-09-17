@@ -15,9 +15,7 @@ template <class T> void SafeRelease(T **ppT)
 // Set up COM
 HRESULT InitCOM()
 {
-	HRESULT hr;
-	hr = CoInitialize(nullptr);
-	return hr;
+	return CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
 }
 
 HRESULT SetDefaultAudioPlaybackDevice(_In_ LPCWSTR devId)
