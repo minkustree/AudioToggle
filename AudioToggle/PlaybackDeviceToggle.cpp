@@ -1,6 +1,8 @@
 #include "stdafx.h"
 #include "PlaybackDeviceToggle.h"
 #include "IPolicyConfig.h"
+#include <Functiondiscoverykeys_devpkey.h>
+#include <propvarutil.h>
 
 // helps us release COM objects cleanly
 template <class T> void SafeRelease(T **ppT)
@@ -31,6 +33,42 @@ HRESULT SetDefaultAudioPlaybackDevice(_In_ LPCWSTR devId)
 
 	return hr;
 }
+
+// Caller must free pwszFriendlyName with CoTaskMemFree when done
+HRESULT GetFriendlyName(_In_ LPCWSTR devId, _Out_ LPWSTR * pwszFriendlyName)
+{
+	HRESULT hr;
+	IMMDeviceEnumerator *pDeviceEnumerator = nullptr;
+	IMMDevice *pDevice = nullptr;
+	IPropertyStore *pPropStore = nullptr;
+
+	hr = CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL, IID_PPV_ARGS(&pDeviceEnumerator));
+	if (SUCCEEDED(hr))
+	{
+		hr = pDeviceEnumerator->GetDevice(devId, &pDevice);
+	}
+	if (SUCCEEDED(hr))
+	{
+		hr = pDevice->OpenPropertyStore(STGM_READ, &pPropStore);
+	}
+	if (SUCCEEDED(hr))
+	{
+		PROPVARIANT varName;
+		PropVariantInit(&varName);
+		hr = pPropStore->GetValue(PKEY_Device_FriendlyName, &varName);
+		if (SUCCEEDED(hr)) 
+		{
+			hr = PropVariantToStringAlloc(varName, pwszFriendlyName);
+		}
+		PropVariantClear(&varName);
+	}
+	
+	SafeRelease(&pPropStore);
+	SafeRelease(&pDevice);
+	SafeRelease(&pDeviceEnumerator);
+	return hr;
+}
+
 
 // ppstrId must be freed by CoTaskMemFree
 HRESULT GetDefaultAudioPlaybackDevice(_Outptr_ LPWSTR *ppstrId)

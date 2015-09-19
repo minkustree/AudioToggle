@@ -14,7 +14,6 @@ WCHAR szWindowClass[MAX_LOADSTRING];            // the main window class name
 HICON speakerIcon;
 HICON headphoneIcon;
 BOOL isHeadphones;
-HMENU g_contextMenu;
 
 static const UINT NOTIFY_ICON_ID = 1;			// identifies a specific notification icon
 const UINT WMAPP_NOTIFY_EVENT = WM_APP + 1;		// called when something happens in the tray icon
@@ -29,6 +28,7 @@ LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 HRESULT				ShowNotificationIcon(HWND hWnd);
 HRESULT				RemoveNotificationIcon(HWND hWnd);
+HRESULT				SetIconAndTooltip(NOTIFYICONDATA * nid);
 void				LoadIcons(HINSTANCE hInstance);
 void				FreeIcons();
 BOOL				ShowContextMenu(HWND hwnd, POINT pt);
@@ -77,7 +77,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
             DispatchMessage(&msg);
         }
     }
-
+	
+	CleanupCOM();
     return (int) msg.wParam;
 }
 
@@ -106,21 +107,22 @@ HRESULT ShowNotificationIcon(HWND hWnd)
 HRESULT SetIconAndTooltip(NOTIFYICONDATA *pNid)
 {
 	HRESULT hr;
+
+	LPCWSTR szDeviceId = isHeadphones ? szHeadphoneDeviceId : szSpeakerDeviceId;
 	pNid->uFlags |= NIF_TIP | NIF_SHOWTIP | NIF_ICON;
-	if (isHeadphones)
-	{
-		hr = SetDefaultAudioPlaybackDevice(szSpeakerDeviceId);
-		if FAILED(hr) return hr;
-		StringCchCopy(pNid->szTip, ARRAYSIZE(pNid->szTip), TEXT("Speakers"));
-		pNid->hIcon = speakerIcon;
-	}
+	pNid->hIcon = isHeadphones ? headphoneIcon : speakerIcon;
+
+	LPWSTR friendlyName;
+	hr = GetFriendlyName(szDeviceId, &friendlyName);
+	if SUCCEEDED(hr) {
+		hr = StringCchCopy(pNid->szTip, ARRAYSIZE(pNid->szTip), friendlyName);
+		CoTaskMemFree(friendlyName);
+	} 
 	else
 	{
-		hr = SetDefaultAudioPlaybackDevice(szHeadphoneDeviceId);
-		if (FAILED(hr)) { return hr; }
-		StringCchCopy(pNid->szTip, ARRAYSIZE(pNid->szTip), TEXT("Headphones"));
-		pNid->hIcon = headphoneIcon;
+		hr = StringCchCopy(pNid->szTip, ARRAYSIZE(pNid->szTip), L"Unknown device");
 	}
+	return hr;
 }
 
 HRESULT RemoveNotificationIcon(HWND hWnd)
@@ -131,15 +133,32 @@ HRESULT RemoveNotificationIcon(HWND hWnd)
 	return Shell_NotifyIcon(NIM_DELETE, &nid);
 }
 
-HRESULT ModifyNotificationText(HWND hWnd)
+HRESULT ToggleDefaultDevice()
 {
+	HRESULT hr;
+
+	// device to switch to: if we're headphones, we switch to speakers
+	LPCWSTR szNextDeviceId = isHeadphones ? szSpeakerDeviceId : szHeadphoneDeviceId;
+	hr = SetDefaultAudioPlaybackDevice(szNextDeviceId);
+	if SUCCEEDED(hr)
+	{
+		// toggle the boolean which tracks default device
+		isHeadphones = !isHeadphones;
+	}
+	return hr;
+}
+
+HRESULT UpdateNotificationIcon(HWND hWnd) {
 	HRESULT hr;
 	NOTIFYICONDATA nid = { sizeof(nid) };
 	nid.hWnd = hWnd;
 	nid.uID = NOTIFY_ICON_ID;
-	SetIconAndTooltip(&nid);
-	isHeadphones = !isHeadphones;
-	return Shell_NotifyIcon(NIM_MODIFY, &nid);
+	hr = SetIconAndTooltip(&nid);
+	if SUCCEEDED(hr)
+	{
+		hr = Shell_NotifyIcon(NIM_MODIFY, &nid);
+	}
+	return hr;
 }
 
 //
@@ -193,12 +212,6 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
    return TRUE;
 }
 
-void InitContextMenu()
-{
-	
-
-}
-
 //
 //  FUNCTION: WndProc(HWND, UINT, WPARAM, LPARAM)
 //
@@ -223,7 +236,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			// Parse the menu selections:
 			switch (wmId)
 			{
-			case IDM_EXIT:
 			case IDM_CONTEXT_EXIT:
 				DestroyWindow(hWnd);
 				break;
@@ -234,19 +246,17 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         break;
     case WM_DESTROY:
 		RemoveNotificationIcon(hWnd);
-		DestroyMenu(g_contextMenu);
-		CleanupCOM();
 		PostQuitMessage(0);
 		break;
 	case WMAPP_NOTIFY_EVENT:
 		switch (LOWORD(lParam))
 		{
 		case NIN_SELECT:
-			ModifyNotificationText(hWnd);
+			ToggleDefaultDevice();
+			UpdateNotificationIcon(hWnd);
 			break;
 		case WM_CONTEXTMENU:
 		{
-
 			POINT pt = { GET_X_LPARAM(wParam), GET_Y_LPARAM(wParam) };
 			ShowContextMenu(hWnd, pt);
 			break;
@@ -298,9 +308,19 @@ BOOL ShowContextMenu(HWND hwnd, POINT pt)
 
 void LoadIcons(HINSTANCE hInstance)
 {
-	HMODULE mmres = LoadLibrary(TEXT("mmres"));
-	speakerIcon = static_cast<HICON>(LoadImage(mmres, MAKEINTRESOURCE(3010), IMAGE_ICON, GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), LR_SHARED));
-	headphoneIcon = static_cast<HICON>(LoadImage(mmres, MAKEINTRESOURCE(3015), IMAGE_ICON, GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), LR_SHARED));
-	// not sure if I have to free this libary here or not, or whether it renders the icons invalid?
-	FreeLibrary(mmres);
+	HMODULE hmodMmres = LoadLibrary(TEXT("mmres"));
+	speakerIcon = static_cast<HICON>(LoadImage(hmodMmres, 
+		MAKEINTRESOURCE(3010), 
+		IMAGE_ICON, 
+		GetSystemMetrics(SM_CXSMICON), 
+		GetSystemMetrics(SM_CYSMICON), 
+		LR_SHARED));
+	headphoneIcon = static_cast<HICON>(LoadImage(hmodMmres, 
+		MAKEINTRESOURCE(3015), 
+		IMAGE_ICON, 
+		GetSystemMetrics(SM_CXSMICON), 
+		GetSystemMetrics(SM_CYSMICON), 
+		LR_SHARED));
+	FreeLibrary(hmodMmres);
 }
+
