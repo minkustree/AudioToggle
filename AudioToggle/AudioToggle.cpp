@@ -13,11 +13,14 @@ WCHAR szTitle[MAX_LOADSTRING];                  // The title bar text
 WCHAR szWindowClass[MAX_LOADSTRING];            // the main window class name
 HICON speakerIcon;
 HICON headphoneIcon;
-BOOL isAltIcon;
+BOOL isHeadphones;
 HMENU g_contextMenu;
 
 static const UINT NOTIFY_ICON_ID = 1;			// identifies a specific notification icon
 const UINT WMAPP_NOTIFY_EVENT = WM_APP + 1;		// called when something happens in the tray icon
+
+LPCWSTR szSpeakerDeviceId = L"{0.0.0.00000000}.{20fc265e-1269-47e7-8718-377317faa951}";
+LPCWSTR szHeadphoneDeviceId = L"{0.0.0.00000000}.{6764b0e9-deec-4b03-9c33-dc163bc41f15}";
 
 // Forward declarations of functions included in this code module:
 ATOM                MyRegisterClass(HINSTANCE hInstance);
@@ -38,10 +41,13 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     UNREFERENCED_PARAMETER(hPrevInstance);
     UNREFERENCED_PARAMETER(lpCmdLine);
 
-    // TODO: Place code here.
+ 
 	InitCOM();
+
+	// Determine if we're headphones or not
 	LPWSTR deviceId;
 	GetDefaultAudioPlaybackDevice(&deviceId);
+	isHeadphones = (wcscmp(deviceId, szHeadphoneDeviceId) == 0);
 	CoTaskMemFree(deviceId);
 
     // Initialize global strings
@@ -51,8 +57,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
 	// Pre-load icons
 	LoadIcons(hInstance);
-	isAltIcon = FALSE;
-
+	
     // Perform application initialization:
     if (!InitInstance (hInstance, nCmdShow))
     {
@@ -78,18 +83,44 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
 HRESULT ShowNotificationIcon(HWND hWnd)
 {
-
+	HRESULT hr;
 	NOTIFYICONDATA nid = { sizeof(nid) };
-		
 	nid.hWnd = hWnd;
-	nid.uFlags = NIF_ICON | NIF_TIP | NIF_SHOWTIP |  NIF_MESSAGE;
 	nid.uID = NOTIFY_ICON_ID;
-	nid.hIcon = speakerIcon;
+	nid.uFlags |= NIF_MESSAGE;
 	nid.uCallbackMessage = WMAPP_NOTIFY_EVENT;
-	StringCchCopy(nid.szTip, ARRAYSIZE(nid.szTip), TEXT("Andy's Tooltip"));
 	nid.uVersion = NOTIFYICON_VERSION_4;
-	Shell_NotifyIcon(NIM_ADD, &nid);
-	return Shell_NotifyIcon(NIM_SETVERSION, &nid);
+	
+	hr = SetIconAndTooltip(&nid);
+	if SUCCEEDED(hr)
+	{
+		hr = Shell_NotifyIcon(NIM_ADD, &nid);
+	}
+	if SUCCEEDED(hr) 
+	{
+		hr = Shell_NotifyIcon(NIM_SETVERSION, &nid);
+	}
+	return hr;
+}
+
+HRESULT SetIconAndTooltip(NOTIFYICONDATA *pNid)
+{
+	HRESULT hr;
+	pNid->uFlags |= NIF_TIP | NIF_SHOWTIP | NIF_ICON;
+	if (isHeadphones)
+	{
+		hr = SetDefaultAudioPlaybackDevice(szSpeakerDeviceId);
+		if FAILED(hr) return hr;
+		StringCchCopy(pNid->szTip, ARRAYSIZE(pNid->szTip), TEXT("Speakers"));
+		pNid->hIcon = speakerIcon;
+	}
+	else
+	{
+		hr = SetDefaultAudioPlaybackDevice(szHeadphoneDeviceId);
+		if (FAILED(hr)) { return hr; }
+		StringCchCopy(pNid->szTip, ARRAYSIZE(pNid->szTip), TEXT("Headphones"));
+		pNid->hIcon = headphoneIcon;
+	}
 }
 
 HRESULT RemoveNotificationIcon(HWND hWnd)
@@ -102,22 +133,12 @@ HRESULT RemoveNotificationIcon(HWND hWnd)
 
 HRESULT ModifyNotificationText(HWND hWnd)
 {
+	HRESULT hr;
 	NOTIFYICONDATA nid = { sizeof(nid) };
-	nid.uFlags = NIF_TIP | NIF_SHOWTIP | NIF_ICON;
 	nid.hWnd = hWnd;
 	nid.uID = NOTIFY_ICON_ID;
-	
-	if (isAltIcon)
-	{
-		StringCchCopy(nid.szTip, ARRAYSIZE(nid.szTip), TEXT("Speakers"));
-		nid.hIcon = speakerIcon;
-	}
-	else
-	{
-		StringCchCopy(nid.szTip, ARRAYSIZE(nid.szTip), TEXT("Headphones"));
-		nid.hIcon = headphoneIcon;
-	}
-	isAltIcon = !isAltIcon;
+	SetIconAndTooltip(&nid);
+	isHeadphones = !isHeadphones;
 	return Shell_NotifyIcon(NIM_MODIFY, &nid);
 }
 
@@ -211,17 +232,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			}
 		}
         break;
-  //  case WM_PAINT:
-		//{
-		//	PAINTSTRUCT ps;
-		//	HDC hdc = BeginPaint(hWnd, &ps);
-		//	// TODO: Add any drawing code that uses hdc here...
-		//	EndPaint(hWnd, &ps);
-		//}
-  //      break;
     case WM_DESTROY:
 		RemoveNotificationIcon(hWnd);
-		FreeIcons();
 		DestroyMenu(g_contextMenu);
 		CleanupCOM();
 		PostQuitMessage(0);
@@ -291,10 +303,4 @@ void LoadIcons(HINSTANCE hInstance)
 	headphoneIcon = static_cast<HICON>(LoadImage(mmres, MAKEINTRESOURCE(3015), IMAGE_ICON, GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), LR_SHARED));
 	// not sure if I have to free this libary here or not, or whether it renders the icons invalid?
 	FreeLibrary(mmres);
-}
-
-void FreeIcons() 
-{
-	//if (speakerIcon) DestroyIcon(speakerIcon);
-	//if (headphoneIcon) DestroyIcon(headphoneIcon);
 }
