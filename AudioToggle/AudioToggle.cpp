@@ -11,6 +11,7 @@
 HINSTANCE hInst;                                // current instance
 WCHAR szTitle[MAX_LOADSTRING];                  // The title bar text
 WCHAR szWindowClass[MAX_LOADSTRING];            // the main window class name
+HWND g_hWnd;									// Handle to the main window
 HICON speakerIcon;
 HICON headphoneIcon;
 BOOL isHeadphones;
@@ -18,14 +19,11 @@ BOOL isHeadphones;
 static const UINT NOTIFY_ICON_ID = 1;			// identifies a specific notification icon
 const UINT WMAPP_NOTIFY_EVENT = WM_APP + 1;		// called when something happens in the tray icon
 
-LPCWSTR szSpeakerDeviceId = L"{0.0.0.00000000}.{20fc265e-1269-47e7-8718-377317faa951}";
-LPCWSTR szHeadphoneDeviceId = L"{0.0.0.00000000}.{6764b0e9-deec-4b03-9c33-dc163bc41f15}";
 
 // Forward declarations of functions included in this code module:
 ATOM                MyRegisterClass(HINSTANCE hInstance);
 BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
-INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 HRESULT				ShowNotificationIcon(HWND hWnd);
 HRESULT				RemoveNotificationIcon(HWND hWnd);
 HRESULT				SetIconAndTooltip(NOTIFYICONDATA * nid);
@@ -148,10 +146,10 @@ HRESULT ToggleDefaultDevice()
 	return hr;
 }
 
-HRESULT UpdateNotificationIcon(HWND hWnd) {
+HRESULT UpdateNotificationIcon() {
 	HRESULT hr;
 	NOTIFYICONDATA nid = { sizeof(nid) };
-	nid.hWnd = hWnd;
+	nid.hWnd = g_hWnd;
 	nid.uID = NOTIFY_ICON_ID;
 	hr = SetIconAndTooltip(&nid);
 	if SUCCEEDED(hr)
@@ -203,7 +201,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 
    HWND hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
       CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, nullptr, nullptr, hInstance, nullptr);
-
+   g_hWnd = hWnd; // store window handle to identify our notification icon
    if (!hWnd)
    {
       return FALSE;
@@ -253,7 +251,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		{
 		case NIN_SELECT:
 			ToggleDefaultDevice();
-			UpdateNotificationIcon(hWnd);
+			// We update icon in response to callback from Windows on default device change
 			break;
 		case WM_CONTEXTMENU:
 		{

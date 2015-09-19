@@ -1,8 +1,10 @@
 #include "stdafx.h"
 #include "PlaybackDeviceToggle.h"
+#include "AudioToggle.h"
 #include "IPolicyConfig.h"
 #include <Functiondiscoverykeys_devpkey.h>
 #include <propvarutil.h>
+
 
 // helps us release COM objects cleanly
 template <class T> void SafeRelease(T **ppT)
@@ -14,10 +16,108 @@ template <class T> void SafeRelease(T **ppT)
 	}
 }
 
+class CMMNotificationClient : public IMMNotificationClient
+{
+	LONG _cRef;
+
+public:
+	CMMNotificationClient() : _cRef(1)
+	{
+	}
+
+	~CMMNotificationClient()
+	{
+	}
+
+	// IUnknown methods
+
+	ULONG STDMETHODCALLTYPE AddRef()
+	{
+		return InterlockedIncrement(&_cRef);
+	}
+
+	ULONG STDMETHODCALLTYPE Release()
+	{
+		ULONG ulRef = InterlockedDecrement(&_cRef);
+		if (ulRef == 0)
+		{
+			delete this;
+		}
+		return ulRef;
+	}
+
+	HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, VOID **ppvInterface)
+	{
+		if (IID_IUnknown == riid)
+		{
+			AddRef();
+			*ppvInterface = (IUnknown*)this;
+		}
+		else if (__uuidof(IMMNotificationClient) == riid) {
+			AddRef();
+			*ppvInterface = (IMMNotificationClient*)this;
+		}
+		else
+		{
+			*ppvInterface = NULL;
+			return E_NOINTERFACE;
+		}
+		return S_OK;
+	}
+
+	// Callback methods for device-event notifications
+
+	HRESULT STDMETHODCALLTYPE OnDefaultDeviceChanged(
+		_In_ EDataFlow flow,
+		_In_ ERole     role,
+		_In_ LPCWSTR   pwstrDefaultDevice
+		) {
+		if (eRender == flow && eConsole == role) {
+			// is the new device our headphone device?
+			isHeadphones = (wcscmp(pwstrDefaultDevice, szHeadphoneDeviceId) == 0);
+			// update the notification icon
+			UpdateNotificationIcon();
+		}
+		return S_OK;
+	}
+
+	HRESULT STDMETHODCALLTYPE OnDeviceAdded(LPCWSTR pwstrDeviceId) {
+		return S_OK;
+	}
+
+	HRESULT STDMETHODCALLTYPE OnDeviceRemoved(LPCWSTR pwstrDeviceId) {
+		return S_OK;
+	}
+
+	HRESULT STDMETHODCALLTYPE OnDeviceStateChanged(LPCWSTR pwstrDeviceId, DWORD dwNewState) {
+		return S_OK;
+	}
+
+	HRESULT STDMETHODCALLTYPE OnPropertyValueChanged(LPCWSTR pwstrDeviceId, const PROPERTYKEY key) {
+		return S_OK;
+	}
+
+
+};
+
+// global variables
+IMMDeviceEnumerator *g_pDeviceEnumerator;
+CMMNotificationClient *g_pNotificationClient;
+
 // Set up COM
 HRESULT InitCOM()
 {
-	return CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+	HRESULT hr;
+	hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+	if SUCCEEDED(hr) 
+	{
+		hr = CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL, IID_PPV_ARGS(&g_pDeviceEnumerator));
+		g_pNotificationClient = new CMMNotificationClient;
+	}
+	if SUCCEEDED(hr) {
+		hr = g_pDeviceEnumerator->RegisterEndpointNotificationCallback(g_pNotificationClient);
+	}
+	return hr;
 }
 
 HRESULT SetDefaultAudioPlaybackDevice(_In_ LPCWSTR devId)
@@ -29,6 +129,14 @@ HRESULT SetDefaultAudioPlaybackDevice(_In_ LPCWSTR devId)
 	{
 		hr = pPolicyConfig->SetDefaultEndpoint(devId, eConsole);
 	}
+	if SUCCEEDED(hr)
+	{
+		hr = pPolicyConfig->SetDefaultEndpoint(devId, eMultimedia);
+	}
+	if SUCCEEDED(hr)
+	{
+		hr = pPolicyConfig->SetDefaultEndpoint(devId, eCommunications);
+	}
 	SafeRelease(&pPolicyConfig);
 
 	return hr;
@@ -38,15 +146,11 @@ HRESULT SetDefaultAudioPlaybackDevice(_In_ LPCWSTR devId)
 HRESULT GetFriendlyName(_In_ LPCWSTR devId, _Out_ LPWSTR * pwszFriendlyName)
 {
 	HRESULT hr;
-	IMMDeviceEnumerator *pDeviceEnumerator = nullptr;
+	
 	IMMDevice *pDevice = nullptr;
 	IPropertyStore *pPropStore = nullptr;
 
-	hr = CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL, IID_PPV_ARGS(&pDeviceEnumerator));
-	if (SUCCEEDED(hr))
-	{
-		hr = pDeviceEnumerator->GetDevice(devId, &pDevice);
-	}
+	hr = g_pDeviceEnumerator->GetDevice(devId, &pDevice);
 	if (SUCCEEDED(hr))
 	{
 		hr = pDevice->OpenPropertyStore(STGM_READ, &pPropStore);
@@ -65,7 +169,6 @@ HRESULT GetFriendlyName(_In_ LPCWSTR devId, _Out_ LPWSTR * pwszFriendlyName)
 	
 	SafeRelease(&pPropStore);
 	SafeRelease(&pDevice);
-	SafeRelease(&pDeviceEnumerator);
 	return hr;
 }
 
@@ -93,6 +196,12 @@ HRESULT GetDefaultAudioPlaybackDevice(_Outptr_ LPWSTR *ppstrId)
 
 void CleanupCOM()
 {
+	if (g_pNotificationClient && g_pDeviceEnumerator)
+	{
+		g_pDeviceEnumerator->UnregisterEndpointNotificationCallback(g_pNotificationClient);
+	}
+	SafeRelease(&g_pNotificationClient);
+	SafeRelease(&g_pDeviceEnumerator);
 	CoUninitialize();
 }
 
