@@ -24,11 +24,10 @@ const UINT WMAPP_NOTIFY_EVENT = WM_APP + 1;		// called when something happens in
 ATOM                MyRegisterClass(HINSTANCE hInstance);
 BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
-HRESULT				ShowNotificationIcon(HWND hWnd);
-HRESULT				RemoveNotificationIcon(HWND hWnd);
+BOOL				ShowNotificationIcon(HWND hWnd);
+BOOL				RemoveNotificationIcon(HWND hWnd);
 HRESULT				SetIconAndTooltip(NOTIFYICONDATA * nid);
-void				LoadIcons(HINSTANCE hInstance);
-void				FreeIcons();
+BOOL				LoadIcons(HINSTANCE hInstance);
 BOOL				ShowContextMenu(HWND hwnd, POINT pt);
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
@@ -80,26 +79,19 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     return (int) msg.wParam;
 }
 
-HRESULT ShowNotificationIcon(HWND hWnd)
+BOOL ShowNotificationIcon(HWND hWnd)
 {
-	HRESULT hr;
 	NOTIFYICONDATA nid = { sizeof(nid) };
 	nid.hWnd = hWnd;
 	nid.uID = NOTIFY_ICON_ID;
 	nid.uFlags |= NIF_MESSAGE;
 	nid.uCallbackMessage = WMAPP_NOTIFY_EVENT;
 	nid.uVersion = NOTIFYICON_VERSION_4;
-	
-	hr = SetIconAndTooltip(&nid);
-	if SUCCEEDED(hr)
-	{
-		hr = Shell_NotifyIcon(NIM_ADD, &nid);
-	}
-	if SUCCEEDED(hr) 
-	{
-		hr = Shell_NotifyIcon(NIM_SETVERSION, &nid);
-	}
-	return hr;
+
+	if FAILED(	SetIconAndTooltip(&nid)					) return FALSE;
+	if		 (!	Shell_NotifyIcon(NIM_ADD, &nid)			) return FALSE;
+	if       (!	Shell_NotifyIcon(NIM_SETVERSION, &nid)	) return FALSE;
+	return TRUE;
 }
 
 HRESULT SetIconAndTooltip(NOTIFYICONDATA *pNid)
@@ -123,7 +115,7 @@ HRESULT SetIconAndTooltip(NOTIFYICONDATA *pNid)
 	return hr;
 }
 
-HRESULT RemoveNotificationIcon(HWND hWnd)
+BOOL RemoveNotificationIcon(HWND hWnd)
 {
 	NOTIFYICONDATA nid = { sizeof(nid) };
 	nid.hWnd = hWnd;
@@ -154,7 +146,7 @@ HRESULT UpdateNotificationIcon() {
 	hr = SetIconAndTooltip(&nid);
 	if SUCCEEDED(hr)
 	{
-		hr = Shell_NotifyIcon(NIM_MODIFY, &nid);
+		hr = Shell_NotifyIcon(NIM_MODIFY, &nid) ? S_OK : E_FAIL;
 	}
 	return hr;
 }
@@ -304,21 +296,29 @@ BOOL ShowContextMenu(HWND hwnd, POINT pt)
 	return TRUE;
 }
 
-void LoadIcons(HINSTANCE hInstance)
+BOOL LoadIcons(HINSTANCE hInstance)
 {
 	HMODULE hmodMmres = LoadLibrary(TEXT("mmres"));
-	speakerIcon = static_cast<HICON>(LoadImage(hmodMmres, 
-		MAKEINTRESOURCE(3010), 
-		IMAGE_ICON, 
-		GetSystemMetrics(SM_CXSMICON), 
-		GetSystemMetrics(SM_CYSMICON), 
-		LR_SHARED));
-	headphoneIcon = static_cast<HICON>(LoadImage(hmodMmres, 
-		MAKEINTRESOURCE(3015), 
-		IMAGE_ICON, 
-		GetSystemMetrics(SM_CXSMICON), 
-		GetSystemMetrics(SM_CYSMICON), 
-		LR_SHARED));
-	FreeLibrary(hmodMmres);
+	if (hmodMmres)
+	{
+		speakerIcon = static_cast<HICON>(LoadImage(hmodMmres,
+			MAKEINTRESOURCE(3010),
+			IMAGE_ICON,
+			GetSystemMetrics(SM_CXSMICON),
+			GetSystemMetrics(SM_CYSMICON),
+			LR_SHARED));
+		headphoneIcon = static_cast<HICON>(LoadImage(hmodMmres,
+			MAKEINTRESOURCE(3015),
+			IMAGE_ICON,
+			GetSystemMetrics(SM_CXSMICON),
+			GetSystemMetrics(SM_CYSMICON),
+			LR_SHARED));
+		FreeLibrary(hmodMmres);
+		return TRUE;
+	}
+	else
+	{
+		return FALSE;
+	}
 }
 
