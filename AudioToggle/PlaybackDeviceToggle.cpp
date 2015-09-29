@@ -159,7 +159,7 @@ HRESULT GetFriendlyName(_In_ LPCWSTR devId, _Out_ LPWSTR * pwszFriendlyName)
 	{
 		PROPVARIANT varName;
 		PropVariantInit(&varName);
-		hr = pPropStore->GetValue(PKEY_Device_FriendlyName, &varName);
+		hr = pPropStore->GetValue(PKEY_Device_DeviceDesc, &varName);
 		if (SUCCEEDED(hr)) 
 		{
 			hr = PropVariantToStringAlloc(varName, pwszFriendlyName);
