@@ -261,11 +261,18 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 BOOL ShowContextMenu(HWND hwnd, POINT pt)
 {
-	HMENU hMenu = LoadMenu(hInst, MAKEINTRESOURCE(IDR_CONTEXTMENU));
-	if (hMenu)
-	{
-		HMENU hSubMenu = GetSubMenu(hMenu, 0);
-		if (hSubMenu)
+	
+	
+//	InsertMenu()
+	//HMENU hMenu = LoadMenu(hInst, MAKEINTRESOURCE(IDR_CONTEXTMENU));
+	//if (hMenu)
+	//{
+		HMENU hContextMenu = CreatePopupMenu();
+		BOOL menuPopulated;
+		if (hContextMenu) {
+			menuPopulated = AppendMenu(hContextMenu, MF_ENABLED | MF_STRING, /* ID for the exit item */ IDM_CONTEXT_EXIT, L"E&xit");
+		}
+		if (hContextMenu && menuPopulated)
 		{
 			// our window must be foreground before calling TrackPopupMenu or the menu will not disappear when the user clicks away
 			SetForegroundWindow(hwnd);
@@ -281,18 +288,19 @@ BOOL ShowContextMenu(HWND hwnd, POINT pt)
 				uFlags |= TPM_LEFTALIGN;
 			}
 
-			TrackPopupMenuEx(hSubMenu, uFlags, pt.x, pt.y, hwnd, NULL);
+			TrackPopupMenuEx(hContextMenu, uFlags, pt.x, pt.y, hwnd, NULL);
 		}
 		else
 		{
 			return FALSE;
 		}
-		DestroyMenu(hMenu);
-	}
-	else
-	{
-		return FALSE;
-	}
+		DestroyMenu(hContextMenu);
+		//DestroyMenu(hMenu);
+	//}
+	//else
+	//{
+	//	return FALSE;
+	//}
 	return TRUE;
 }
 

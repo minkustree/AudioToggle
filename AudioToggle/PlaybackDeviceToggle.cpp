@@ -4,6 +4,7 @@
 #include "IPolicyConfig.h"
 #include <Functiondiscoverykeys_devpkey.h>
 #include <propvarutil.h>
+#include <map>
 
 
 // helps us release COM objects cleanly
@@ -139,6 +140,45 @@ HRESULT SetDefaultAudioPlaybackDevice(_In_ LPCWSTR devId)
 	}
 	SafeRelease(&pPolicyConfig);
 
+	return hr;
+}
+
+struct
+{
+	LPCWSTR lpwszfriendlyName;
+	HICON hIcon;
+} myStruct;
+
+HRESULT EnumerateDevices()
+{
+	HRESULT hr;
+	IMMDeviceCollection *pDevices;
+	UINT deviceCount;
+	std::map <LPCWSTR, void*> mDevices;
+	hr = g_pDeviceEnumerator->EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE, &pDevices);
+	if SUCCEEDED(hr)
+	{
+		hr = pDevices->GetCount(&deviceCount);
+	}
+	if (SUCCEEDED(hr))
+	{
+		IMMDevice *pDevice;
+		LPWSTR pstrId;
+		for (UINT i = 0; i < deviceCount; i++) 
+		{
+			hr = pDevices->Item(i, &pDevice);
+			if (SUCCEEDED(hr)) 
+			{
+				hr = pDevice->GetId(&pstrId);
+			}
+			if (SUCCEEDED(hr)) {
+				
+			}
+			SafeRelease(&pDevice);
+		}
+		
+	}
+	SafeRelease(&pDevices);
 	return hr;
 }
 
