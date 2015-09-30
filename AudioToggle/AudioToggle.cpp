@@ -4,6 +4,7 @@
 #include "stdafx.h"
 #include "AudioToggle.h"
 #include "PlaybackDeviceToggle.h"
+#include <vector>
 
 #define MAX_LOADSTRING 100
 
@@ -63,6 +64,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
     HACCEL hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_AUDIOTOGGLE));
 
+	EnumerateDevices();
     MSG msg;
 
     // Main message loop:
@@ -259,48 +261,40 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     return 0;
 }
 
+
+
+std::vector<deviceMenuInfo> vDevices;
+
 BOOL ShowContextMenu(HWND hwnd, POINT pt)
 {
-	
-	
-//	InsertMenu()
-	//HMENU hMenu = LoadMenu(hInst, MAKEINTRESOURCE(IDR_CONTEXTMENU));
-	//if (hMenu)
-	//{
-		HMENU hContextMenu = CreatePopupMenu();
-		BOOL menuPopulated;
-		if (hContextMenu) {
-			menuPopulated = AppendMenu(hContextMenu, MF_ENABLED | MF_STRING, /* ID for the exit item */ IDM_CONTEXT_EXIT, L"E&xit");
-		}
-		if (hContextMenu && menuPopulated)
+	HMENU hContextMenu = CreatePopupMenu();
+	BOOL menuPopulated;
+	if (hContextMenu) {
+		menuPopulated = AppendMenu(hContextMenu, MF_ENABLED | MF_STRING, /* ID for the exit item */ IDM_CONTEXT_EXIT, L"E&xit");
+	}
+	if (hContextMenu && menuPopulated)
+	{
+		// our window must be foreground before calling TrackPopupMenu or the menu will not disappear when the user clicks away
+		SetForegroundWindow(hwnd);
+
+		// respect menu drop alignment
+		UINT uFlags = TPM_RIGHTBUTTON;
+		if (GetSystemMetrics(SM_MENUDROPALIGNMENT) != 0)
 		{
-			// our window must be foreground before calling TrackPopupMenu or the menu will not disappear when the user clicks away
-			SetForegroundWindow(hwnd);
-
-			// respect menu drop alignment
-			UINT uFlags = TPM_RIGHTBUTTON;
-			if (GetSystemMetrics(SM_MENUDROPALIGNMENT) != 0)
-			{
-				uFlags |= TPM_RIGHTALIGN;
-			}
-			else
-			{
-				uFlags |= TPM_LEFTALIGN;
-			}
-
-			TrackPopupMenuEx(hContextMenu, uFlags, pt.x, pt.y, hwnd, NULL);
+			uFlags |= TPM_RIGHTALIGN;
 		}
 		else
 		{
-			return FALSE;
+			uFlags |= TPM_LEFTALIGN;
 		}
-		DestroyMenu(hContextMenu);
-		//DestroyMenu(hMenu);
-	//}
-	//else
-	//{
-	//	return FALSE;
-	//}
+
+		TrackPopupMenuEx(hContextMenu, uFlags, pt.x, pt.y, hwnd, NULL);
+	}
+	else
+	{
+		return FALSE;
+	}
+	DestroyMenu(hContextMenu);
 	return TRUE;
 }
 

@@ -9,4 +9,12 @@ static LPCWSTR szHeadphoneDeviceId = L"{0.0.0.00000000}.{6764b0e9-deec-4b03-9c33
 
 extern BOOL isHeadphones;
 
+struct deviceMenuInfo
+{
+	LPWSTR	pstrId;
+	LPWSTR	pstrFriendlyName;
+	HICON	hIcon;
+
+};
+
 HRESULT UpdateNotificationIcon();

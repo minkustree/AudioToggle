@@ -4,7 +4,7 @@
 #include "IPolicyConfig.h"
 #include <Functiondiscoverykeys_devpkey.h>
 #include <propvarutil.h>
-#include <map>
+#include <vector>
 
 
 // helps us release COM objects cleanly
@@ -143,18 +143,11 @@ HRESULT SetDefaultAudioPlaybackDevice(_In_ LPCWSTR devId)
 	return hr;
 }
 
-struct
-{
-	LPCWSTR lpwszfriendlyName;
-	HICON hIcon;
-} myStruct;
-
-HRESULT EnumerateDevices()
+HRESULT EnumerateDevices(/*std::vector<deviceMenuInfo> vDevices*/)
 {
 	HRESULT hr;
 	IMMDeviceCollection *pDevices;
 	UINT deviceCount;
-	std::map <LPCWSTR, void*> mDevices;
 	hr = g_pDeviceEnumerator->EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE, &pDevices);
 	if SUCCEEDED(hr)
 	{
@@ -162,24 +155,80 @@ HRESULT EnumerateDevices()
 	}
 	if (SUCCEEDED(hr))
 	{
-		IMMDevice *pDevice;
-		LPWSTR pstrId;
 		for (UINT i = 0; i < deviceCount; i++) 
 		{
+			IMMDevice *pDevice;
 			hr = pDevices->Item(i, &pDevice);
-			if (SUCCEEDED(hr)) 
-			{
-				hr = pDevice->GetId(&pstrId);
-			}
-			if (SUCCEEDED(hr)) {
-				
-			}
+			GetDeviceInfo(pDevice);
 			SafeRelease(&pDevice);
 		}
 		
 	}
 	SafeRelease(&pDevices);
 	return hr;
+}
+
+HRESULT GetDeviceInfo(IMMDevice *pDevice)
+{
+	HRESULT hr;
+	IPropertyStore *pProperties = nullptr;
+	PROPVARIANT propVar;
+
+	LPWSTR pstrId;
+	LPWSTR pstrFriendlyName;
+	HICON hIcon;
+
+	hr = pDevice->GetId(&pstrId); // free with CoTaskMemFree
+	if SUCCEEDED(hr)
+	{
+		hr = pDevice->OpenPropertyStore(STGM_READ, &pProperties);
+	}
+
+	// friendly name
+	if SUCCEEDED(hr)
+	{
+		PropVariantInit(&propVar);
+		hr = pProperties->GetValue(PKEY_Device_DeviceDesc, &propVar);
+	}
+	if SUCCEEDED(hr)
+	{
+		hr = PropVariantToStringAlloc(propVar, &pstrFriendlyName);
+	}
+	
+	// icon
+	if SUCCEEDED(hr)
+	{
+		PropVariantClear(&propVar);
+		hr = pProperties->GetValue(PKEY_DeviceClass_IconPath, &propVar);
+		hIcon = LoadDeviceIcon(propVar.pwszVal);
+	}
+
+	PropVariantClear(&propVar);
+	SafeRelease(&pProperties);
+	return hr;
+}
+
+// Supplied icon path will be truncated after calling
+HICON LoadDeviceIcon(_Inout_ LPWSTR pszIconPath) 
+{
+	// TODO: Split pszIconPath into filename,resourceId components
+	HICON result = NULL;
+	int resource = PathParseIconLocation(pszIconPath);
+	HMODULE hMod = LoadLibraryEx(pszIconPath, NULL, LOAD_LIBRARY_AS_DATAFILE | LOAD_LIBRARY_AS_IMAGE_RESOURCE);
+	if (hMod)
+	{
+		result = (HICON)LoadImage(hMod, MAKEINTRESOURCE(resource), IMAGE_ICON, GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), LR_SHARED);
+		FreeLibrary(hMod);
+	} 
+	else
+	{
+		DWORD errorId = GetLastError();
+		if (errorId == 0)
+		{
+			printf("Error %d", errorId);
+		}
+	}
+	return result;
 }
 
 // Caller must free pwszFriendlyName with CoTaskMemFree when done
