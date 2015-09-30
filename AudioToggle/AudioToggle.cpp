@@ -4,7 +4,6 @@
 #include "stdafx.h"
 #include "AudioToggle.h"
 #include "PlaybackDeviceToggle.h"
-#include <vector>
 
 #define MAX_LOADSTRING 100
 
@@ -16,6 +15,8 @@ HWND g_hWnd;									// Handle to the main window
 HICON speakerIcon;
 HICON headphoneIcon;
 BOOL isHeadphones;
+
+std::vector<AudioDeviceInfo> g_vDeviceInfo;
 
 static const UINT NOTIFY_ICON_ID = 1;			// identifies a specific notification icon
 const UINT WMAPP_NOTIFY_EVENT = WM_APP + 1;		// called when something happens in the tray icon
@@ -30,6 +31,7 @@ BOOL				RemoveNotificationIcon(HWND hWnd);
 HRESULT				SetIconAndTooltip(NOTIFYICONDATA * nid);
 BOOL				LoadIcons(HINSTANCE hInstance);
 BOOL				ShowContextMenu(HWND hwnd, POINT pt);
+void				FreeDeviceInfo();
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
@@ -76,9 +78,23 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
             DispatchMessage(&msg);
         }
     }
-	
+
+	FreeDeviceInfo();
 	CleanupCOM();
     return (int) msg.wParam;
+}
+
+void FreeDeviceInfo() {
+	for (AudioDeviceInfo info : g_vDeviceInfo)
+	{
+		CoTaskMemFree(info.pszId);
+		CoTaskMemFree(info.pszFriendlyName);
+		if (info.hIcon) {
+			DestroyIcon(info.hIcon);
+			info.hIcon = NULL;
+		}
+	}
+	g_vDeviceInfo.clear();
 }
 
 BOOL ShowNotificationIcon(HWND hWnd)
@@ -263,14 +279,25 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 
 
-std::vector<deviceMenuInfo> vDevices;
+std::vector<AudioDeviceInfo> vDevices;
 
 BOOL ShowContextMenu(HWND hwnd, POINT pt)
 {
 	HMENU hContextMenu = CreatePopupMenu();
-	BOOL menuPopulated;
+	BOOL menuPopulated = TRUE;
 	if (hContextMenu) {
-		menuPopulated = AppendMenu(hContextMenu, MF_ENABLED | MF_STRING, /* ID for the exit item */ IDM_CONTEXT_EXIT, L"E&xit");
+		LPWSTR pszDefaultDeviceId;
+		GetDefaultAudioPlaybackDevice(&pszDefaultDeviceId);
+		
+		for (AudioDeviceInfo info : g_vDeviceInfo) {
+			UINT flags = MF_ENABLED | MF_STRING;
+			if (wcscmp(pszDefaultDeviceId, info.pszId) == 0) {
+				flags |= MF_CHECKED;
+			}
+			menuPopulated &= AppendMenu(hContextMenu, flags, info.uSequence, info.pszFriendlyName);
+		}
+		menuPopulated &= AppendMenu(hContextMenu, MF_SEPARATOR, 0, 0);
+		menuPopulated &= AppendMenu(hContextMenu, MF_ENABLED | MF_STRING, /* ID for the exit item */ IDM_CONTEXT_EXIT, L"E&xit");
 	}
 	if (hContextMenu && menuPopulated)
 	{
@@ -323,4 +350,3 @@ BOOL LoadIcons(HINSTANCE hInstance)
 		return FALSE;
 	}
 }
-

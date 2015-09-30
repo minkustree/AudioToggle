@@ -1,6 +1,7 @@
 #pragma once
 
 #include "resource.h"
+#include <vector>
 
 // Opaque audio device IDs for the two devices I'm interested in: Speakers and Optical Out (Headphones)
 
@@ -9,12 +10,16 @@ static LPCWSTR szHeadphoneDeviceId = L"{0.0.0.00000000}.{6764b0e9-deec-4b03-9c33
 
 extern BOOL isHeadphones;
 
-struct deviceMenuInfo
+struct AudioDeviceInfo
 {
-	LPWSTR	pstrId;
-	LPWSTR	pstrFriendlyName;
+	UINT    uSequence;
+	LPWSTR	pszId;
+	LPWSTR	pszFriendlyName;
 	HICON	hIcon;
-
 };
+
+
+extern std::vector<AudioDeviceInfo> g_vDeviceInfo;
+
 
 HRESULT UpdateNotificationIcon();

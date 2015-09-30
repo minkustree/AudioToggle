@@ -17,6 +17,26 @@ template <class T> void SafeRelease(T **ppT)
 	}
 }
 
+//Returns the last Win32 error, in string format. Returns an empty string if there is no error.
+std::string GetLastErrorAsString()
+{
+	//Get the error message, if any.
+	DWORD errorMessageID = ::GetLastError();
+	if (errorMessageID == 0)
+		return std::string(); //No error message has been recorded
+
+	LPSTR messageBuffer = nullptr;
+	size_t size = FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+		NULL, errorMessageID, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPSTR)&messageBuffer, 0, NULL);
+
+	std::string message(messageBuffer, size);
+
+	//Free the buffer.
+	LocalFree(messageBuffer);
+
+	return message;
+}
+
 class CMMNotificationClient : public IMMNotificationClient
 {
 	LONG _cRef;
@@ -143,7 +163,8 @@ HRESULT SetDefaultAudioPlaybackDevice(_In_ LPCWSTR devId)
 	return hr;
 }
 
-HRESULT EnumerateDevices(/*std::vector<deviceMenuInfo> vDevices*/)
+
+HRESULT EnumerateDevices()
 {
 	HRESULT hr;
 	IMMDeviceCollection *pDevices;
@@ -155,11 +176,15 @@ HRESULT EnumerateDevices(/*std::vector<deviceMenuInfo> vDevices*/)
 	}
 	if (SUCCEEDED(hr))
 	{
+		g_vDeviceInfo.clear();
 		for (UINT i = 0; i < deviceCount; i++) 
 		{
 			IMMDevice *pDevice;
 			hr = pDevices->Item(i, &pDevice);
-			GetDeviceInfo(pDevice);
+			AudioDeviceInfo info;
+			info.uSequence = 3004 + i;
+			GetDeviceInfo(pDevice, &info);
+			g_vDeviceInfo.push_back(info); // creates a copy
 			SafeRelease(&pDevice);
 		}
 		
@@ -168,17 +193,18 @@ HRESULT EnumerateDevices(/*std::vector<deviceMenuInfo> vDevices*/)
 	return hr;
 }
 
-HRESULT GetDeviceInfo(IMMDevice *pDevice)
+
+
+HRESULT GetDeviceInfo(IMMDevice *pDevice, AudioDeviceInfo *info)
 {
 	HRESULT hr;
 	IPropertyStore *pProperties = nullptr;
 	PROPVARIANT propVar;
 
-	LPWSTR pstrId;
-	LPWSTR pstrFriendlyName;
-	HICON hIcon;
+	PropVariantInit(&propVar);
 
-	hr = pDevice->GetId(&pstrId); // free with CoTaskMemFree
+	// id
+	hr = pDevice->GetId(&(info->pszId)); // free with CoTaskMemFree
 	if SUCCEEDED(hr)
 	{
 		hr = pDevice->OpenPropertyStore(STGM_READ, &pProperties);
@@ -187,12 +213,12 @@ HRESULT GetDeviceInfo(IMMDevice *pDevice)
 	// friendly name
 	if SUCCEEDED(hr)
 	{
-		PropVariantInit(&propVar);
-		hr = pProperties->GetValue(PKEY_Device_DeviceDesc, &propVar);
+		
+		hr = pProperties->GetValue(PKEY_Device_FriendlyName, &propVar);
 	}
 	if SUCCEEDED(hr)
 	{
-		hr = PropVariantToStringAlloc(propVar, &pstrFriendlyName);
+		hr = PropVariantToStringAlloc(propVar, &(info->pszFriendlyName)); // free with CoTaskMemFree
 	}
 	
 	// icon
@@ -200,7 +226,7 @@ HRESULT GetDeviceInfo(IMMDevice *pDevice)
 	{
 		PropVariantClear(&propVar);
 		hr = pProperties->GetValue(PKEY_DeviceClass_IconPath, &propVar);
-		hIcon = LoadDeviceIcon(propVar.pwszVal);
+		LoadDeviceIcon(propVar.pwszVal, &info->hIcon); // free with DestroyIcon
 	}
 
 	PropVariantClear(&propVar);
@@ -208,28 +234,38 @@ HRESULT GetDeviceInfo(IMMDevice *pDevice)
 	return hr;
 }
 
-// Supplied icon path will be truncated after calling
-HICON LoadDeviceIcon(_Inout_ LPWSTR pszIconPath) 
+// Supplied icon path will be truncated after calling. Icon must be destroyed after use with DestroyIcon
+void LoadDeviceIcon(_Inout_ LPWSTR pszIconPath, _Out_ HICON *phIcon) 
 {
-	// TODO: Split pszIconPath into filename,resourceId components
-	HICON result = NULL;
-	int resource = PathParseIconLocation(pszIconPath);
-	HMODULE hMod = LoadLibraryEx(pszIconPath, NULL, LOAD_LIBRARY_AS_DATAFILE | LOAD_LIBRARY_AS_IMAGE_RESOURCE);
-	if (hMod)
-	{
-		result = (HICON)LoadImage(hMod, MAKEINTRESOURCE(resource), IMAGE_ICON, GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), LR_SHARED);
-		FreeLibrary(hMod);
-	} 
-	else
-	{
-		DWORD errorId = GetLastError();
-		if (errorId == 0)
-		{
-			printf("Error %d", errorId);
-		}
-	}
-	return result;
+	// Destructive split of pszIconPath into filename,resourceId components
+	int resourceId = PathParseIconLocation(pszIconPath);
+	UINT cExtracted = ExtractIconEx(pszIconPath, resourceId, NULL, phIcon, 1);
+
+
+	//ExpandEnvironmentStrings(pszIconPath, szExpandedLibraryPath, MAX_PATH+1); // TODO: Check for errors
+	//HMODULE hMod = LoadLibraryEx(szExpandedLibraryPath, NULL, LOAD_LIBRARY_AS_DATAFILE | LOAD_LIBRARY_AS_IMAGE_RESOURCE);
+	//if (hMod)
+	//{
+	//	result = (HICON)LoadImage(hMod, MAKEINTRESOURCE(resource), IMAGE_ICON, GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), LR_SHARED);
+	//	if (!result)
+	//	{
+	//		std::string err = GetLastErrorAsString();
+	//		printf("Error %s", err);
+	//	}
+	//	FreeLibrary(hMod);
+	//} 
+	//else
+	//{
+	//	DWORD errorId = GetLastError();
+	//	if (errorId == 0)
+	//	{
+	//		printf("Error %d", errorId);
+	//	}
+	//}
+	//return result;
 }
+
+
 
 // Caller must free pwszFriendlyName with CoTaskMemFree when done
 HRESULT GetFriendlyName(_In_ LPCWSTR devId, _Out_ LPWSTR * pwszFriendlyName)
