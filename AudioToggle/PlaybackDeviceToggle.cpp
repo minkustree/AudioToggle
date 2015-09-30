@@ -240,32 +240,36 @@ void LoadDeviceIcon(_Inout_ LPWSTR pszIconPath, _Out_ HICON *phIcon)
 	// Destructive split of pszIconPath into filename,resourceId components
 	int resourceId = PathParseIconLocation(pszIconPath);
 	UINT cExtracted = ExtractIconEx(pszIconPath, resourceId, NULL, phIcon, 1);
-
-
-	//ExpandEnvironmentStrings(pszIconPath, szExpandedLibraryPath, MAX_PATH+1); // TODO: Check for errors
-	//HMODULE hMod = LoadLibraryEx(szExpandedLibraryPath, NULL, LOAD_LIBRARY_AS_DATAFILE | LOAD_LIBRARY_AS_IMAGE_RESOURCE);
-	//if (hMod)
-	//{
-	//	result = (HICON)LoadImage(hMod, MAKEINTRESOURCE(resource), IMAGE_ICON, GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), LR_SHARED);
-	//	if (!result)
-	//	{
-	//		std::string err = GetLastErrorAsString();
-	//		printf("Error %s", err);
-	//	}
-	//	FreeLibrary(hMod);
-	//} 
-	//else
-	//{
-	//	DWORD errorId = GetLastError();
-	//	if (errorId == 0)
-	//	{
-	//		printf("Error %d", errorId);
-	//	}
-	//}
-	//return result;
 }
 
+HRESULT GetDeviceIcon(_In_ LPCWSTR devId, _Out_ HICON *phIcon)
+{
+	HRESULT hr;
 
+	IMMDevice *pDevice = nullptr;
+	IPropertyStore *pPropStore = nullptr;
+
+	hr = g_pDeviceEnumerator->GetDevice(devId, &pDevice);
+	if (SUCCEEDED(hr))
+	{
+		hr = pDevice->OpenPropertyStore(STGM_READ, &pPropStore);
+	}
+	if (SUCCEEDED(hr))
+	{
+		PROPVARIANT varIcon;
+		PropVariantInit(&varIcon);
+		hr = pPropStore->GetValue(PKEY_DeviceClass_IconPath, &varIcon);
+		if (SUCCEEDED(hr))
+		{
+			LoadDeviceIcon(varIcon.pwszVal, phIcon); // free with DestroyIcon
+		}
+		PropVariantClear(&varIcon);
+	}
+
+	SafeRelease(&pPropStore);
+	SafeRelease(&pDevice);
+	return hr;
+}
 
 // Caller must free pwszFriendlyName with CoTaskMemFree when done
 HRESULT GetFriendlyName(_In_ LPCWSTR devId, _Out_ LPWSTR * pwszFriendlyName)
@@ -284,7 +288,7 @@ HRESULT GetFriendlyName(_In_ LPCWSTR devId, _Out_ LPWSTR * pwszFriendlyName)
 	{
 		PROPVARIANT varName;
 		PropVariantInit(&varName);
-		hr = pPropStore->GetValue(PKEY_Device_DeviceDesc, &varName);
+		hr = pPropStore->GetValue(PKEY_Device_FriendlyName, &varName);
 		if (SUCCEEDED(hr)) 
 		{
 			hr = PropVariantToStringAlloc(varName, pwszFriendlyName);
@@ -329,134 +333,4 @@ void CleanupCOM()
 	SafeRelease(&g_pDeviceEnumerator);
 	CoUninitialize();
 }
-
-//
-//
-//void PrintPropertyStore(IPropertyStore *pPropertyStore)
-//{
-//	
-//	DWORD cProps;
-//	pPropertyStore->GetCount(&cProps);
-//
-//
-//	for (DWORD i = 0; i < cProps; i++) {
-//		PROPERTYKEY key;
-//		pPropertyStore->GetAt(i, &key);
-//
-//		IPropertyDescription *propDescription = NULL;
-//		HRESULT hr = PSGetPropertyDescription(key, IID_PPV_ARGS(&propDescription));
-//		
-//		if (SUCCEEDED(hr)) 
-//		{
-//			LPWSTR propertyName = NULL;
-//			if (SUCCEEDED(propDescription->GetDisplayName(&propertyName)))
-//			{
-//				std::wcout << "  " << propertyName << std::endl;
-//				CoTaskMemFree(propertyName);
-//			}
-//			propDescription->Release();
-//		} 
-//		else
-//		{
-//			switch (hr)
-//			{
-//			case E_INVALIDARG: {
-//				std::cout << "The ppv parameter is NULL" << std::endl;
-//				break;
-//			}
-//			case TYPE_E_ELEMENTNOTFOUND: {
-//				std::cout << "The PROPERTYKEY does not exist in the schema subsystem cache" << std::endl;
-//				break;
-//			}
-//			default: {
-//				std::cout << "Unknown result code: " << hr << std::endl;
-//			}
-//			}
-//		}
-//	}
-//}
-//
-
-
-
-
-//HRESULT PrintDeviceInfo(IMMDevice *pDevice) 
-//{
-//	HRESULT hr = S_OK;
-//	LPWSTR pszId = NULL;
-//	IPropertyStore *pPropertyStore = NULL;
-//
-//	hr = pDevice->GetId(&pszId);
-//	if FAILED(hr) goto done;
-//
-//	hr = pDevice->OpenPropertyStore(STGM_READ, &pPropertyStore);
-//	if FAILED(hr) goto done;
-//
-//	PROPVARIANT friendlyName;
-//	PropVariantInit(&friendlyName);
-//	hr = pPropertyStore->GetValue(PKEY_Device_FriendlyName, &friendlyName);
-//	if FAILED(hr) goto done;
-//
-//	PROPVARIANT deviceFriendlyName;
-//	PropVariantInit(&deviceFriendlyName);
-//	hr = pPropertyStore->GetValue(PKEY_DeviceInterface_FriendlyName, &deviceFriendlyName);
-//	if FAILED(hr) goto done;
-//
-//	PROPVARIANT formFactor;
-//	PropVariantInit(&formFactor);
-//	hr = pPropertyStore->GetValue(PKEY_AudioEndpoint_FormFactor, &formFactor);
-//	if FAILED(hr) goto done;
-//
-//	std::wcout << "Device " << pszId << ": " << friendlyName.pwszVal << " on " << deviceFriendlyName.pwszVal << ". Form factor: " << formFactor.uintVal << std::endl;
-//
-//	done:
-//		PropVariantClear(&formFactor);
-//		PropVariantClear(&deviceFriendlyName);
-//		PropVariantClear(&friendlyName);
-//		if (pszId != NULL) CoTaskMemFree(pszId);
-//		SafeRelease(&pPropertyStore);
-//		return hr;
-//}
-
-//int main()
-//{
-//	HRESULT hr;
-//
-//	if FAILED(InitCOM()) { CleanupAndExit(1); }
-//	if FAILED(PrintDefaultDevice()) { CleanupAndExit(2); }
-//
-//	int rv = 0;
-//	IPolicyConfig *pPolicyConfig = NULL;
-//	
-//	IMMDeviceCollection *pDeviceCollection = NULL;
-//	
-//	if (FAILED(pDeviceEnumerator->EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE, &pDeviceCollection))) {
-//		std::cout << "Error enumerating audio endpoints" << std::endl;
-//		rv = 3;
-//		goto cleanup;
-//	}
-//	
-//	UINT count;
-//	pDeviceCollection->GetCount(&count);
-//	for (UINT i = 0; i < count; i++) {
-//		IMMDevice *pDevice = NULL;
-//		if (FAILED(pDeviceCollection->Item(i, &pDevice))) {
-//			std::cout << "Failed to get details for device " << i << ". Skipping." << std::endl;
-//			continue;
-//		}
-//		
-//		PrintDeviceInfo(pDevice);
-//		SafeRelease(&pDevice);
-//		
-//	}
-//
-//	std::cout << "Success" << std::endl;
-//	
-//	cleanup:
-//		std::cout << "Press any key to exit" << std::endl;
-//		std::cin.ignore();
-//		if (pDeviceCollection != NULL) { pDeviceCollection->Release(); }
-//		if (pDeviceEnumerator != NULL) { pDeviceEnumerator->Release(); }
-//		exit(rv);
-//}
 

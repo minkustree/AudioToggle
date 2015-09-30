@@ -115,14 +115,26 @@ BOOL ShowNotificationIcon(HWND hWnd)
 HRESULT SetIconAndTooltip(NOTIFYICONDATA *pNid)
 {
 	HRESULT hr;
-
-	LPCWSTR szDeviceId = isHeadphones ? szHeadphoneDeviceId : szSpeakerDeviceId;
-	pNid->uFlags |= NIF_TIP | NIF_SHOWTIP | NIF_ICON;
-	pNid->hIcon = isHeadphones ? headphoneIcon : speakerIcon;
-
-	LPWSTR friendlyName;
-	hr = GetFriendlyName(szDeviceId, &friendlyName);
-	if SUCCEEDED(hr) {
+	LPWSTR szDeviceId = NULL;
+	LPWSTR friendlyName = NULL;
+	// might be called from a different thread in response to default device changed
+	// initialize COM in case it's not already initialized. I dread to think about the
+	// cost implications of initializing COM in a random callback thread...
+	hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED); 
+	if (SUCCEEDED(hr)) {
+		hr = GetDefaultAudioPlaybackDevice(&szDeviceId);
+	}
+	if (SUCCEEDED(hr))
+	{
+		hr = GetDeviceIcon(szDeviceId, &pNid->hIcon);
+	}
+	if (SUCCEEDED(hr))
+	{
+		pNid->uFlags |= NIF_ICON;
+		hr = GetFriendlyName(szDeviceId, &friendlyName);
+	}
+	if (SUCCEEDED(hr))
+	{
 		hr = StringCchCopy(pNid->szTip, ARRAYSIZE(pNid->szTip), friendlyName);
 		CoTaskMemFree(friendlyName);
 	} 
@@ -130,6 +142,12 @@ HRESULT SetIconAndTooltip(NOTIFYICONDATA *pNid)
 	{
 		hr = StringCchCopy(pNid->szTip, ARRAYSIZE(pNid->szTip), L"Unknown device");
 	}
+	if (SUCCEEDED(hr)) {
+		pNid->uFlags |= NIF_TIP | NIF_SHOWTIP;
+	}
+	CoTaskMemFree(szDeviceId);
+	// and uninitialize COM again since we initialized it here
+	CoUninitialize();
 	return hr;
 }
 
