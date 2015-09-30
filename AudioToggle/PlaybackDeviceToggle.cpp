@@ -184,7 +184,7 @@ HRESULT EnumerateDevices()
 			AudioDeviceInfo info;
 			info.uSequence = 3004 + i;
 			GetDeviceInfo(pDevice, &info);
-			g_vDeviceInfo.push_back(info); // creates a copy
+			g_vDeviceInfo.emplace(3004 + i, info); // creates a copy
 			SafeRelease(&pDevice);
 		}
 		

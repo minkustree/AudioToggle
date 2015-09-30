@@ -1,7 +1,7 @@
 #pragma once
 
 #include "resource.h"
-#include <vector>
+#include <map>
 
 // Opaque audio device IDs for the two devices I'm interested in: Speakers and Optical Out (Headphones)
 
@@ -19,7 +19,7 @@ struct AudioDeviceInfo
 };
 
 
-extern std::vector<AudioDeviceInfo> g_vDeviceInfo;
+extern std::map<unsigned int, AudioDeviceInfo> g_vDeviceInfo;
 
 
 HRESULT UpdateNotificationIcon();

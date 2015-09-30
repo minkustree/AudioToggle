@@ -16,7 +16,7 @@ HICON speakerIcon;
 HICON headphoneIcon;
 BOOL isHeadphones;
 
-std::vector<AudioDeviceInfo> g_vDeviceInfo;
+std::map<unsigned int, AudioDeviceInfo> g_vDeviceInfo;
 
 static const UINT NOTIFY_ICON_ID = 1;			// identifies a specific notification icon
 const UINT WMAPP_NOTIFY_EVENT = WM_APP + 1;		// called when something happens in the tray icon
@@ -85,13 +85,13 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 }
 
 void FreeDeviceInfo() {
-	for (AudioDeviceInfo info : g_vDeviceInfo)
+	for (std::pair<unsigned int, AudioDeviceInfo> entry: g_vDeviceInfo)
 	{
-		CoTaskMemFree(info.pszId);
-		CoTaskMemFree(info.pszFriendlyName);
-		if (info.hIcon) {
-			DestroyIcon(info.hIcon);
-			info.hIcon = NULL;
+		CoTaskMemFree(entry.second.pszId);
+		CoTaskMemFree(entry.second.pszFriendlyName);
+		if (entry.second.hIcon) {
+			DestroyIcon(entry.second.hIcon);
+			entry.second.hIcon = NULL;
 		}
 	}
 	g_vDeviceInfo.clear();
@@ -248,7 +248,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				DestroyWindow(hWnd);
 				break;
 			default:
-				return DefWindowProc(hWnd, message, wParam, lParam);
+				if (g_vDeviceInfo.count(wmId)) {
+					SetDefaultAudioPlaybackDevice(g_vDeviceInfo[wmId].pszId);
+				}
+				else {
+					return DefWindowProc(hWnd, message, wParam, lParam);
+				}
 			}
 		}
         break;
@@ -278,9 +283,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 }
 
 
-
-std::vector<AudioDeviceInfo> vDevices;
-
 BOOL ShowContextMenu(HWND hwnd, POINT pt)
 {
 	HMENU hContextMenu = CreatePopupMenu();
@@ -289,12 +291,15 @@ BOOL ShowContextMenu(HWND hwnd, POINT pt)
 		LPWSTR pszDefaultDeviceId;
 		GetDefaultAudioPlaybackDevice(&pszDefaultDeviceId);
 		
-		for (AudioDeviceInfo info : g_vDeviceInfo) {
+		for (std::pair<unsigned int, AudioDeviceInfo> entry: g_vDeviceInfo) {
+			unsigned int uMenuId = entry.first;
+			AudioDeviceInfo info = entry.second;
+
 			UINT flags = MF_ENABLED | MF_STRING;
 			if (wcscmp(pszDefaultDeviceId, info.pszId) == 0) {
 				flags |= MF_CHECKED;
 			}
-			menuPopulated &= AppendMenu(hContextMenu, flags, info.uSequence, info.pszFriendlyName);
+			menuPopulated &= AppendMenu(hContextMenu, flags, uMenuId, info.pszFriendlyName);
 		}
 		menuPopulated &= AppendMenu(hContextMenu, MF_SEPARATOR, 0, 0);
 		menuPopulated &= AppendMenu(hContextMenu, MF_ENABLED | MF_STRING, /* ID for the exit item */ IDM_CONTEXT_EXIT, L"E&xit");
