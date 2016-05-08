@@ -16,6 +16,7 @@ struct AudioDeviceInfo
 	LPWSTR	pszId;
 	LPWSTR	pszFriendlyName;
 	HICON	hIcon;
+	HBITMAP hBitmap;
 };
 
 

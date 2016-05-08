@@ -93,6 +93,10 @@ void FreeDeviceInfo() {
 			DestroyIcon(entry.second.hIcon);
 			entry.second.hIcon = NULL;
 		}
+		if (entry.second.hBitmap) {
+			DeleteObject(entry.second.hBitmap);
+			entry.second.hBitmap = NULL;
+		}
 	}
 	g_vDeviceInfo.clear();
 }
@@ -317,13 +321,14 @@ BOOL ShowContextMenu(HWND hwnd, POINT pt)
             MENUITEMINFO mii;
 			ZeroMemory(&mii, sizeof(MENUITEMINFO));
             mii.cbSize = sizeof(MENUITEMINFO);
-			mii.fMask = MIIM_ID | MIIM_STRING | MIIM_STATE;
+			mii.fMask = MIIM_ID | MIIM_STRING | MIIM_STATE | MIIM_BITMAP;
 			mii.wID = uMenuId;
 			mii.dwTypeData = info.pszFriendlyName;
             // show the selected device as checked
 			if (wcscmp(pszDefaultDeviceId, info.pszId) == 0) {
 				mii.fState |= MFS_CHECKED;
 			}
+			mii.hbmpItem = info.hBitmap;
             
             // use InsertMenuItem rather than AppendMenu so we can include icons for the devices
             menuPopulated &= InsertMenuItem(hContextMenu, nextItemPosition, TRUE, &mii);

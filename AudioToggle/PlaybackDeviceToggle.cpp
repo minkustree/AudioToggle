@@ -227,6 +227,7 @@ HRESULT GetDeviceInfo(IMMDevice *pDevice, AudioDeviceInfo *info)
 		PropVariantClear(&propVar);
 		hr = pProperties->GetValue(PKEY_DeviceClass_IconPath, &propVar);
 		LoadDeviceIcon(propVar.pwszVal, &info->hIcon); // free with DestroyIcon
+		IconToBitmap(info->hIcon, &(info->hBitmap)); // free with DeleteObject
 	}
 
 	PropVariantClear(&propVar);
@@ -240,6 +241,28 @@ void LoadDeviceIcon(_Inout_ LPWSTR pszIconPath, _Out_ HICON *phIcon)
 	// Destructive split of pszIconPath into filename,resourceId components
 	int resourceId = PathParseIconLocation(pszIconPath);
 	UINT cExtracted = ExtractIconEx(pszIconPath, resourceId, NULL, phIcon, 1);
+}
+
+// Creates a HBITMAP - free with DeleteObject after use
+void IconToBitmap(_In_ HICON hIcon, _Inout_ HBITMAP *phBitmap) 
+{
+	// convert the icon to a bitmap
+	// 1. Create a bitmap with the same format as the screen
+	HDC screenDC = GetDC(NULL);
+	*phBitmap = CreateCompatibleBitmap(screenDC, 16, 16);
+	HDC drawingDC = CreateCompatibleDC(screenDC); // for drawing into the bitmap
+	
+
+	// Draw the icon into the dc (which is backed by the bitmap)
+	HBITMAP originalBitmap = (HBITMAP)SelectObject(drawingDC, *phBitmap);
+	DrawIconEx(drawingDC, 0, 0, hIcon, 16, 16, 0, GetSysColorBrush(COLOR_MENU), DI_NORMAL); 
+
+	// we're supposed to replace the bitmap in the DC with the original when we're done
+	SelectObject(drawingDC, originalBitmap);
+
+	// clean up
+	DeleteDC(drawingDC);
+	ReleaseDC(NULL, screenDC);
 }
 
 HRESULT GetDeviceIcon(_In_ LPCWSTR devId, _Out_ HICON *phIcon)

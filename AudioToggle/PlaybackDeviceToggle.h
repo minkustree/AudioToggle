@@ -13,4 +13,5 @@ HRESULT GetDeviceIcon(_In_ LPCWSTR devId, _Out_ HICON *phIcon);
 HRESULT GetDeviceInfo(IMMDevice *pDevice, AudioDeviceInfo *info);
 HRESULT EnumerateDevices();
 void	LoadDeviceIcon(_Inout_ LPWSTR pszIconPath, _Out_ HICON *phIcon);
+void	IconToBitmap(_In_ HICON hIcon, _Out_ HBITMAP *phBitmap);
 void	CleanupCOM();
