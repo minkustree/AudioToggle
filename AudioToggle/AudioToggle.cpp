@@ -12,26 +12,12 @@ HINSTANCE hInst;                                // current instance
 WCHAR szTitle[MAX_LOADSTRING];                  // The title bar text
 WCHAR szWindowClass[MAX_LOADSTRING];            // the main window class name
 HWND g_hWnd;									// Handle to the main window
-HICON speakerIcon;
-HICON headphoneIcon;
-BOOL isHeadphones;
 
 std::map<unsigned int, AudioDeviceInfo> g_vDeviceInfo;
 
 static const UINT NOTIFY_ICON_ID = 1;			// identifies a specific notification icon
 const UINT WMAPP_NOTIFY_EVENT = WM_APP + 1;		// called when something happens in the tray icon
 
-
-// Forward declarations of functions included in this code module:
-ATOM                MyRegisterClass(HINSTANCE hInstance);
-BOOL                InitInstance(HINSTANCE, int);
-LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
-BOOL				ShowNotificationIcon(HWND hWnd);
-BOOL				RemoveNotificationIcon(HWND hWnd);
-HRESULT				SetIconAndTooltip(NOTIFYICONDATA * nid);
-BOOL				LoadIcons(HINSTANCE hInstance);
-BOOL				ShowContextMenu(HWND hwnd, POINT pt);
-void				FreeDeviceInfo();
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
@@ -40,24 +26,14 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 {
     UNREFERENCED_PARAMETER(hPrevInstance);
     UNREFERENCED_PARAMETER(lpCmdLine);
-
  
 	InitCOM();
-
-	// Determine if we're headphones or not
-	LPWSTR deviceId;
-	GetDefaultAudioPlaybackDevice(&deviceId);
-	isHeadphones = (wcscmp(deviceId, szHeadphoneDeviceId) == 0);
-	CoTaskMemFree(deviceId);
 
     // Initialize global strings
     LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
     LoadStringW(hInstance, IDC_AUDIOTOGGLE, szWindowClass, MAX_LOADSTRING);
     MyRegisterClass(hInstance);
 
-	// Pre-load icons
-	LoadIcons(hInstance);
-	
     // Perform application initialization:
     if (!InitInstance (hInstance, nCmdShow))
     {
@@ -161,21 +137,6 @@ BOOL RemoveNotificationIcon(HWND hWnd)
 	nid.hWnd = hWnd;
 	nid.uID = NOTIFY_ICON_ID;
 	return Shell_NotifyIcon(NIM_DELETE, &nid);
-}
-
-HRESULT ToggleDefaultDevice()
-{
-	HRESULT hr;
-
-	// device to switch to: if we're headphones, we switch to speakers
-	LPCWSTR szNextDeviceId = isHeadphones ? szSpeakerDeviceId : szHeadphoneDeviceId;
-	hr = SetDefaultAudioPlaybackDevice(szNextDeviceId);
-	if SUCCEEDED(hr)
-	{
-		// toggle the boolean which tracks default device
-		isHeadphones = !isHeadphones;
-	}
-	return hr;
 }
 
 HRESULT UpdateNotificationIcon() {
@@ -286,10 +247,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	case WMAPP_NOTIFY_EVENT:
 		switch (LOWORD(lParam))
 		{
-		case NIN_SELECT:
-			ToggleDefaultDevice();
-			// We update icon in response to callback from Windows on default device change
-			break;
 		case WM_CONTEXTMENU:
 		{
 			POINT pt = { GET_X_LPARAM(wParam), GET_Y_LPARAM(wParam) };
@@ -361,30 +318,4 @@ BOOL ShowContextMenu(HWND hwnd, POINT pt)
 	}
 	DestroyMenu(hContextMenu);
 	return TRUE;
-}
-
-BOOL LoadIcons(HINSTANCE hInstance)
-{
-	HMODULE hmodMmres = LoadLibrary(TEXT("mmres"));
-	if (hmodMmres)
-	{
-		speakerIcon = static_cast<HICON>(LoadImage(hmodMmres,
-			MAKEINTRESOURCE(3010),
-			IMAGE_ICON,
-			GetSystemMetrics(SM_CXSMICON),
-			GetSystemMetrics(SM_CYSMICON),
-			LR_SHARED));
-		headphoneIcon = static_cast<HICON>(LoadImage(hmodMmres,
-			MAKEINTRESOURCE(3015),
-			IMAGE_ICON,
-			GetSystemMetrics(SM_CXSMICON),
-			GetSystemMetrics(SM_CYSMICON),
-			LR_SHARED));
-		FreeLibrary(hmodMmres);
-		return TRUE;
-	}
-	else
-	{
-		return FALSE;
-	}
 }

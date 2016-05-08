@@ -94,8 +94,6 @@ public:
 		_In_ LPCWSTR   pwstrDefaultDevice
 		) {
 		if (eRender == flow && eConsole == role) {
-			// is the new device our headphone device?
-			isHeadphones = (wcscmp(pwstrDefaultDevice, szHeadphoneDeviceId) == 0);
 			// update the notification icon
 			UpdateNotificationIcon();
 		}
