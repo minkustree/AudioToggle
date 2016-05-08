@@ -246,18 +246,38 @@ void LoadDeviceIcon(_Inout_ LPWSTR pszIconPath, _Out_ HICON *phIcon)
 // Creates a HBITMAP - free with DeleteObject after use
 void IconToBitmap(_In_ HICON hIcon, _Inout_ HBITMAP *phBitmap) 
 {
-	// convert the icon to a bitmap
-	// 1. Create a bitmap with the same format as the screen
-	HDC screenDC = GetDC(NULL);
 	int x_sm = GetSystemMetrics(SM_CXSMICON);
 	int y_sm = GetSystemMetrics(SM_CYSMICON);
-	*phBitmap = CreateCompatibleBitmap(screenDC, x_sm, y_sm);
+
+	// convert the icon to a bitmap
+	HDC screenDC = GetDC(NULL);
+	/*
+		To get masked drawing, we need to DrawIconEx to a ARGB32 bitmap. 
+		GetCompatibleBitmap didn't seem to be good enough - we'd get end up having to 
+		paint the background in as the menu colour. 
+
+		https://social.msdn.microsoft.com/Forums/windowsdesktop/en-US/b3dde0f6-b20b-4a96-885e-f72bad3a2ae6/add-icon-to-themed-menu?forum=windowsuidevelopment
+
+		suggests that a 32bpp DIBSECTION bitmap with BI_RGB compression does the trick
+
+		This makes a bunch of assumptions about the format of the icon (32bpp with Alpha)
+		and what that means for transparent drawing.
+	*/
+	BITMAPINFO bmi;
+	bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+	bmi.bmiHeader.biWidth = x_sm;
+	bmi.bmiHeader.biHeight = y_sm;
+	bmi.bmiHeader.biPlanes = 1;
+	bmi.bmiHeader.biBitCount = 32;
+	bmi.bmiHeader.biCompression = BI_RGB;
+	void * pBitsIgnored;
+	*phBitmap = CreateDIBSection(screenDC, &bmi, DIB_RGB_COLORS, &pBitsIgnored, NULL, 0);
+
 	HDC drawingDC = CreateCompatibleDC(screenDC); // for drawing into the bitmap
-	
 
 	// Draw the icon into the dc (which is backed by the bitmap)
 	HBITMAP originalBitmap = (HBITMAP)SelectObject(drawingDC, *phBitmap);
-	DrawIconEx(drawingDC, 0, 0, hIcon, x_sm, y_sm, 0, GetSysColorBrush(COLOR_MENU), DI_NORMAL); 
+	DrawIconEx(drawingDC, 0, 0, hIcon, x_sm, y_sm, 0, 0, DI_NORMAL); 
 
 	// we're supposed to replace the bitmap in the DC with the original when we're done
 	SelectObject(drawingDC, originalBitmap);
