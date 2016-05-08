@@ -249,13 +249,15 @@ void IconToBitmap(_In_ HICON hIcon, _Inout_ HBITMAP *phBitmap)
 	// convert the icon to a bitmap
 	// 1. Create a bitmap with the same format as the screen
 	HDC screenDC = GetDC(NULL);
-	*phBitmap = CreateCompatibleBitmap(screenDC, 16, 16);
+	int x_sm = GetSystemMetrics(SM_CXSMICON);
+	int y_sm = GetSystemMetrics(SM_CYSMICON);
+	*phBitmap = CreateCompatibleBitmap(screenDC, x_sm, y_sm);
 	HDC drawingDC = CreateCompatibleDC(screenDC); // for drawing into the bitmap
 	
 
 	// Draw the icon into the dc (which is backed by the bitmap)
 	HBITMAP originalBitmap = (HBITMAP)SelectObject(drawingDC, *phBitmap);
-	DrawIconEx(drawingDC, 0, 0, hIcon, 16, 16, 0, GetSysColorBrush(COLOR_MENU), DI_NORMAL); 
+	DrawIconEx(drawingDC, 0, 0, hIcon, x_sm, y_sm, 0, GetSysColorBrush(COLOR_MENU), DI_NORMAL); 
 
 	// we're supposed to replace the bitmap in the DC with the original when we're done
 	SelectObject(drawingDC, originalBitmap);
