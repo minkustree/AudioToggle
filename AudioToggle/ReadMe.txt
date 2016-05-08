@@ -1,3 +1,12 @@
+ACKNOWLEDGEMENTS
+================
+
+Application Icon:
+  Double-J-Design-Ravenna-3d-Sound-Mixer.ico 
+  by Double-J Design (http://www.doublejdesign.co.uk/)
+  Licensed under the CC BY 4.0 license: http://creativecommons.org/licenses/by/4.0/
+  Found at http://www.iconarchive.com/show/ravenna-3d-icons-by-double-j-design/Sound-Mixer-icon.html
+
 ========================================================================
     WIN32 APPLICATION : AudioToggle Project Overview
 ========================================================================
