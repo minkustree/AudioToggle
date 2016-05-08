@@ -309,15 +309,25 @@ BOOL ShowContextMenu(HWND hwnd, POINT pt)
 		LPWSTR pszDefaultDeviceId;
 		GetDefaultAudioPlaybackDevice(&pszDefaultDeviceId);
 		
+        int nextItemPosition = 0;
 		for (std::pair<unsigned int, AudioDeviceInfo> entry: g_vDeviceInfo) {
 			unsigned int uMenuId = entry.first;
 			AudioDeviceInfo info = entry.second;
-
-			UINT flags = MF_ENABLED | MF_STRING;
+            
+            MENUITEMINFO mii;
+			ZeroMemory(&mii, sizeof(MENUITEMINFO));
+            mii.cbSize = sizeof(MENUITEMINFO);
+			mii.fMask = MIIM_ID | MIIM_STRING | MIIM_STATE;
+			mii.wID = uMenuId;
+			mii.dwTypeData = info.pszFriendlyName;
+            // show the selected device as checked
 			if (wcscmp(pszDefaultDeviceId, info.pszId) == 0) {
-				flags |= MF_CHECKED;
+				mii.fState |= MFS_CHECKED;
 			}
-			menuPopulated &= AppendMenu(hContextMenu, flags, uMenuId, info.pszFriendlyName);
+            
+            // use InsertMenuItem rather than AppendMenu so we can include icons for the devices
+            menuPopulated &= InsertMenuItem(hContextMenu, nextItemPosition, TRUE, &mii);
+            nextItemPosition++;
 		}
 		menuPopulated &= AppendMenu(hContextMenu, MF_SEPARATOR, 0, 0);
 		menuPopulated &= AppendMenu(hContextMenu, MF_ENABLED | MF_STRING, /* ID for the exit item */ IDM_CONTEXT_EXIT, L"E&xit");
